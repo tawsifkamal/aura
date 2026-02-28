@@ -1,7 +1,7 @@
 {
   "project": "Aura",
   "branchName": "main",
-  "description": "Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using browser-use, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, and email results via AgentMail",
+  "description": "TypeScript-only Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using the browser-use TypeScript library, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, and email results via AgentMail",
   "userStories": [
     {
       "id": "US-001",
@@ -10,7 +10,8 @@
       "acceptanceCriteria": [
         "Create skill file at ~/.claude/commands/record-demo.md",
         "Skill is discoverable via /record-demo command",
-        "Skill contains placeholder prompt structure"
+        "Skill contains placeholder prompt structure",
+        "Implementation baseline is TypeScript-only (Node.js/TS), with no Python runtime dependency for core flow"
       ],
       "priority": 1,
       "passes": false,
@@ -50,7 +51,8 @@
       "title": "Navigate and record with browser-use",
       "description": "Use the browser-use agent to browse the app and record video",
       "acceptanceCriteria": [
-        "Prompt instructs Claude to use the browser-use agent to open app routes",
+        "Prompt instructs Claude to use the browser-use TypeScript library/agent to open app routes",
+        "Use browser-use TypeScript APIs for navigation and interactions (not Python browser-use bindings)",
         "Integrate browser-use runs with Laminar tracing/observability",
         "Integrate browser-use runs with Supermemory so prior runs and route intelligence can be recalled",
         "Visit routes affected by changes",
@@ -98,6 +100,10 @@
       "description": "All generated demo videos should be uploaded to a dashboard page that can be shared",
       "acceptanceCriteria": [
         "Create a dashboard page that lists uploaded demo videos",
+        "Dashboard UI uses a strict black-and-white visual theme (no colorful gradients/glows by default)",
+        "Use sharp, edged corners across cards, panels, buttons, and inputs (avoid overly rounded styling)",
+        "Visual design quality should avoid generic 'AI slop' aesthetics and follow deliberate spacing/typography hierarchy",
+        "Dashboard is highly responsive across mobile, tablet, and desktop breakpoints",
         "Use Convex as the primary database for run metadata and dashboard indexing",
         "Use Convex storage for uploaded demo videos and related media artifacts",
         "Each upload stores metadata: timestamp, branch/PR, commit SHA, and summary",
@@ -106,7 +112,7 @@
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Dashboard is the canonical location for all demo artifacts, backed by Convex"
+      "notes": "Dashboard is the canonical location for all demo artifacts, backed by Convex, with a clean black-and-white editorial UI style"
     },
     {
       "id": "US-008",
@@ -143,7 +149,8 @@
       "description": "Execute the demo generation workflow inside Daytona sandbox environments for isolation and reproducibility",
       "acceptanceCriteria": [
         "Recording pipeline runs in a Daytona sandbox for both Claude skill and PR bot flows",
-        "Sandbox image includes browser-use dependencies and video rendering toolchain",
+        "Sandbox image includes browser-use TypeScript library dependencies and video rendering toolchain",
+        "Sandbox runtime uses Node.js + TypeScript toolchain for all orchestration components",
         "Artifacts can be exported from the sandbox to Convex storage/dashboard pipeline",
         "Pipeline can be resumed or retried without losing run state metadata"
       ],
@@ -192,6 +199,54 @@
       "priority": 13,
       "passes": false,
       "notes": "Applies to both Claude skill runs and PR automation runs"
+    },
+    {
+      "id": "US-014",
+      "title": "In-dashboard post-editing like Screen Studio",
+      "description": "Allow users to edit generated videos after creation directly inside the dashboard with a feature-rich editor",
+      "acceptanceCriteria": [
+        "Users can crop regions of the video after generation and preview results before saving",
+        "Users can trim/split timeline sections and reorder or remove segments",
+        "Users can adjust cursor emphasis, zoom intensity, and motion smoothing in post-processing",
+        "Users can apply and tweak style presets to achieve Screen Studio-like polish",
+        "Editing operations are non-destructive, with ability to revert to the original render",
+        "Edited versions are saved as new versioned artifacts linked to the original run"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Editor should be powerful and production-grade, not a minimal crop-only tool"
+    },
+    {
+      "id": "US-015",
+      "title": "Advanced export controls (MP4, GIF, FPS, quality)",
+      "description": "Provide export options from the dashboard for multiple formats and rendering quality settings",
+      "acceptanceCriteria": [
+        "Users can export edited videos as MP4 and GIF",
+        "Users can select FPS (for example: 24/30/60) and output resolution",
+        "Users can control bitrate/quality and output file size constraints",
+        "Exports support preset profiles (Web share, high quality, lightweight preview)",
+        "Export jobs show progress, ETA, success/failure status, and downloadable outputs",
+        "Export metadata and files are persisted in Convex-linked run records"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Use sane defaults but expose advanced controls for power users"
+    },
+    {
+      "id": "US-016",
+      "title": "AWS-accelerated video processing pipeline",
+      "description": "Use AWS infrastructure for scalable render/transcode/edit processing when available",
+      "acceptanceCriteria": [
+        "Video edit and export jobs can run on AWS-backed workers for scalability",
+        "Pipeline supports queueing, retries, idempotency keys, and dead-letter handling",
+        "System can optionally use hardware-accelerated transcoding where available",
+        "Processing status events stream back to dashboard and PR/skill status surfaces",
+        "If AWS processing is unavailable, system falls back to a local/Daytona-compatible path",
+        "Cost and processing telemetry are captured per job for optimization and credit tracking"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "AWS credits should be leveraged for heavy video workloads and faster export turnaround"
     }
   ]
 }
