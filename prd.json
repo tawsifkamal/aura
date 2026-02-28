@@ -301,6 +301,64 @@
       "priority": 19,
       "passes": false,
       "notes": "This is the conversational counterpart to the dashboard GUI editor (US-014). Both use the same backend editing API. The NLP parsing layer translates free-text prompts into structured edit operations"
+    },
+    {
+      "id": "US-020",
+      "title": "Auto-generate test scripts for each pipeline stage",
+      "description": "Automatically write comprehensive test scripts that validate every stage of the Aura pipeline — from diff detection through video generation, upload, delivery, and editing. Tests should be self-contained and runnable without manual setup",
+      "acceptanceCriteria": [
+        "Auto-generate unit tests for diff detection and route inference logic (US-002)",
+        "Auto-generate integration tests for dev server startup and readiness polling (US-003)",
+        "Auto-generate tests for browser-use navigation and interaction recording (US-004, US-005)",
+        "Auto-generate tests for video post-processing pipeline (cursor animation, zoom, Screen Studio effects) (US-006)",
+        "Auto-generate tests for Convex upload, metadata storage, and dashboard data retrieval (US-007)",
+        "Auto-generate tests for PR bot comment lifecycle (create, update, status transitions) (US-009)",
+        "Auto-generate tests for editing API operations (crop, trim, split, zoom, presets) (US-014)",
+        "Auto-generate tests for export pipeline (MP4, GIF, FPS, resolution, quality) (US-015)",
+        "Auto-generate tests for Composio delivery routing and channel fallback (US-018)",
+        "Auto-generate tests for conversational edit parsing and round-trip re-delivery (US-019)",
+        "All test files follow existing project conventions (Vitest or Jest, TypeScript, co-located or in __tests__/)",
+        "Tests use mocks/stubs for external services (Convex, Composio, AgentMail, GitHub API, browser-use) so they can run offline",
+        "Test scripts include descriptive names and comments explaining what each test validates"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "The agent should analyze each implemented module and write tests autonomously — not just scaffold empty test files. Tests should actually assert correctness"
+    },
+    {
+      "id": "US-021",
+      "title": "End-to-end validation and build verification",
+      "description": "Run the full test suite, typecheck, lint, and build to verify the entire project compiles and passes all quality gates. Fix any issues found during validation",
+      "acceptanceCriteria": [
+        "Run TypeScript typecheck (tsc --noEmit) and fix all type errors",
+        "Run linter (ESLint) and fix all lint violations",
+        "Run the full test suite generated in US-020 and ensure all tests pass",
+        "Run the project build (next build, tsc, or whatever the project uses) and ensure it succeeds with zero errors",
+        "If any check fails, fix the underlying code and re-run until all checks are green",
+        "Final validation output is logged with pass/fail summary for each gate (typecheck, lint, tests, build)",
+        "Validation script can be run as a single command (e.g., npm run validate or a composite script)"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "This is the quality gate — nothing ships unless typecheck + lint + tests + build all pass. The agent should iterate on fixes, not just report failures"
+    },
+    {
+      "id": "US-022",
+      "title": "Create gap-tracking issue for missing coverage and incomplete areas",
+      "description": "After tests and validation pass, audit the codebase for gaps — untested paths, missing error handling, unimplemented stubs, TODO/FIXME markers, and missing integration points. Create a GitHub issue cataloging all gaps with actionable items",
+      "acceptanceCriteria": [
+        "Scan codebase for TODO, FIXME, HACK, and XXX markers and catalog them",
+        "Identify any user stories with thin or missing test coverage",
+        "Identify missing error handling paths (e.g., network failures, invalid inputs, timeout scenarios)",
+        "Identify any placeholder/stub implementations that need real logic",
+        "Identify missing integration points between modules (e.g., Laminar traces not wired, Supermemory not connected)",
+        "Create a single GitHub issue titled 'Aura: Coverage gaps and incomplete areas' with all findings organized by category",
+        "Issue body includes checklist items so each gap can be tracked and closed individually",
+        "Issue is labeled with 'enhancement' and 'tech-debt' labels (create labels if they don't exist)"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": "This is a self-audit step — the agent finds its own blind spots and creates a trackable issue so nothing falls through the cracks"
     }
   ]
 }
