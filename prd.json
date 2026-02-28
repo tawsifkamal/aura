@@ -1,31 +1,32 @@
 {
   "project": "Aura",
   "branchName": "main",
-  "description": "Claude Code plugin that auto-generates video demos of web app changes. Phase 1: Local Playwright MVP",
+  "description": "TypeScript-only Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using the browser-use TypeScript library, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, and email results via AgentMail",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Create plugin structure",
-      "description": "Set up Aura as a Claude Code plugin with proper structure",
+      "title": "Create basic skill file structure",
+      "description": "Set up the Claude Code skill that can be invoked with /record-demo",
       "acceptanceCriteria": [
-        "Create .claude-plugin/plugin.json with name, description, author",
-        "Create skills/record-demo/SKILL.md with placeholder",
-        "Create .mcp.json declaring Playwright dependency",
-        "Plugin can be loaded with: claude --plugin-dir ./aura"
+        "Create skill file at ~/.claude/commands/record-demo.md",
+        "Skill is discoverable via /record-demo command",
+        "Skill contains placeholder prompt structure",
+        "Implementation baseline is TypeScript-only (Node.js/TS), with no Python runtime dependency for core flow"
       ],
       "priority": 1,
       "passes": false,
-      "notes": "Follow anthropics/claude-plugins-official structure"
+      "notes": "Check Claude Code docs for skill file format"
     },
     {
       "id": "US-002",
       "title": "Detect web app and changed files",
       "description": "Skill prompts Claude to analyze git diff and identify what changed",
       "acceptanceCriteria": [
-        "Prompt instructs Claude to run git diff --name-only",
+        "Prompt instructs Claude to run git diff",
         "Detect if project is web app (package.json with react/vue/next/vite)",
-        "Extract list of changed component/page files (.tsx, .jsx, .vue)",
-        "Identify likely affected routes from file paths (pages/, app/, routes/)"
+        "Extract list of changed component/page files",
+        "Identify likely affected routes from file paths",
+        "Use code diffs as context to determine which frontend surfaces the browser agent should navigate to"
       ],
       "priority": 2,
       "passes": false,
@@ -36,38 +37,41 @@
       "title": "Start dev server and wait for ready",
       "description": "Skill prompts Claude to start the dev server before recording",
       "acceptanceCriteria": [
-        "Detect start script from package.json (dev, start, serve)",
-        "Start server in background with Bash tool",
-        "Poll localhost until server responds (try ports 3000, 5173, 8080, 4200)",
-        "Store server PID for cleanup later"
+        "Detect start script from package.json (dev, start, etc.)",
+        "Start server in background",
+        "Wait for server to be ready (poll localhost)",
+        "Handle common ports (3000, 5173, 8080)"
       ],
       "priority": 3,
       "passes": false,
-      "notes": "Server runs in background, skill handles cleanup"
+      "notes": "Use Bash tool for server, need to handle cleanup"
     },
     {
       "id": "US-004",
-      "title": "Navigate and screenshot with Playwright",
-      "description": "Use Playwright MCP to browse the app and capture screenshots",
+      "title": "Navigate and record with browser-use",
+      "description": "Use the browser-use agent to browse the app and record video",
       "acceptanceCriteria": [
-        "Use mcp__playwright__browser_navigate to open localhost",
+        "Prompt instructs Claude to use the browser-use TypeScript library/agent to open app routes",
+        "Use browser-use TypeScript APIs for navigation and interactions (not Python browser-use bindings)",
+        "Integrate browser-use runs with Laminar tracing/observability",
+        "Integrate browser-use runs with Supermemory so prior runs and route intelligence can be recalled",
         "Visit routes affected by changes",
-        "Use mcp__playwright__browser_take_screenshot for each page",
-        "Save screenshots to demos/[timestamp]/ folder"
+        "Take screenshots or record interactions",
+        "Save output to demos/ folder with timestamp"
       ],
       "priority": 4,
       "passes": false,
-      "notes": "User must have Playwright MCP configured"
+      "notes": "Relies on browser-use agent and browser tooling being configured"
     },
     {
       "id": "US-005",
       "title": "AI-driven interaction based on diff",
       "description": "Claude analyzes the diff and decides what to click/test",
       "acceptanceCriteria": [
-        "Skill prompts Claude to read the actual code changes",
-        "Identify new/changed interactive elements (buttons, forms, links)",
-        "Use mcp__playwright__browser_snapshot to see page structure",
-        "Use mcp__playwright__browser_click to interact with changed elements"
+        "Prompt tells Claude to read the actual code changes",
+        "Identify interactive elements (buttons, forms, etc.) that changed",
+        "Generate interaction plan",
+        "Execute interactions via browser-use"
       ],
       "priority": 5,
       "passes": false,
@@ -75,17 +79,174 @@
     },
     {
       "id": "US-006",
-      "title": "Generate summary and cleanup",
-      "description": "Output summary of what was tested, stop server",
+      "title": "Generate Screen Studio-style video and summary",
+      "description": "Output a cinematic demo video and summary of what was tested with media",
       "acceptanceCriteria": [
-        "Create demos/[timestamp]/summary.md with what was tested",
-        "List all screenshots taken with descriptions",
-        "Stop the dev server (kill PID)",
-        "Print demo folder path to user"
+        "Create demos/[timestamp]/ folder",
+        "Produce Screen Studio-style video output with smooth zoom-in emphasis on click/type actions",
+        "Render a synthetic smooth cursor animation between interaction targets instead of relying on raw browser cursor movement",
+        "Cursor animation path and timing should be deterministic and visually smooth across steps",
+        "Save screenshots of each step",
+        "Generate summary.md with what was tested",
+        "Print path to user when done"
       ],
       "priority": 6,
       "passes": false,
-      "notes": "User can attach demos/ folder to PR"
+      "notes": "Requires post-processing layer for zoom and cursor interpolation effects"
+    },
+    {
+      "id": "US-007",
+      "title": "Upload generated videos to dashboard",
+      "description": "All generated demo videos should be uploaded to a dashboard page that can be shared",
+      "acceptanceCriteria": [
+        "Create a dashboard page that lists uploaded demo videos",
+        "Dashboard UI uses a strict black-and-white visual theme (no colorful gradients/glows by default)",
+        "Use sharp, edged corners across cards, panels, buttons, and inputs (avoid overly rounded styling)",
+        "Visual design quality should avoid generic 'AI slop' aesthetics and follow deliberate spacing/typography hierarchy",
+        "Dashboard is highly responsive across mobile, tablet, and desktop breakpoints",
+        "Use Convex as the primary database for run metadata and dashboard indexing",
+        "Use Convex storage for uploaded demo videos and related media artifacts",
+        "Each upload stores metadata: timestamp, branch/PR, commit SHA, and summary",
+        "Each generated run returns a stable dashboard URL for the uploaded video",
+        "Dashboard supports both Claude skill runs and PR-triggered runs"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Dashboard is the canonical location for all demo artifacts, backed by Convex, with a clean black-and-white editorial UI style"
+    },
+    {
+      "id": "US-008",
+      "title": "Claude skill response includes dashboard link",
+      "description": "When used through the Claude skill, Claude replies with the dashboard page URL for the generated video",
+      "acceptanceCriteria": [
+        "After a successful skill run, Claude response includes the dashboard link",
+        "Response also includes short summary of what was recorded",
+        "Link points to the specific uploaded run, not only the dashboard root"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Optimizes handoff from local skill execution to shareable artifact"
+    },
+    {
+      "id": "US-009",
+      "title": "PR bot uploads to dashboard and comments with live status",
+      "description": "For pull requests, GitHub bot uploads videos to dashboard, embeds video in PR comment, and continuously updates that same comment with live status",
+      "acceptanceCriteria": [
+        "On PR open/update, bot triggers demo generation using code diff as navigation context",
+        "Bot uploads resulting video to the dashboard and captures dashboard link",
+        "Bot posts a PR comment containing embedded video preview plus dashboard link",
+        "Bot uses a single persistent PR comment that is edited in place for status updates",
+        "Status lifecycle includes queued, running, uploading, completed, and failed states",
+        "Final comment includes summary of tested frontend areas inferred from diff"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Avoid comment spam by continuously editing one canonical bot comment"
+    },
+    {
+      "id": "US-010",
+      "title": "Run recording pipeline in Daytona sandbox",
+      "description": "Execute the demo generation workflow inside Daytona sandbox environments for isolation and reproducibility",
+      "acceptanceCriteria": [
+        "Recording pipeline runs in a Daytona sandbox for both Claude skill and PR bot flows",
+        "Sandbox image includes browser-use TypeScript library dependencies and video rendering toolchain",
+        "Sandbox runtime uses Node.js + TypeScript toolchain for all orchestration components",
+        "Artifacts can be exported from the sandbox to Convex storage/dashboard pipeline",
+        "Pipeline can be resumed or retried without losing run state metadata"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Daytona is the default execution runtime for untrusted or variable project code"
+    },
+    {
+      "id": "US-011",
+      "title": "Integrate Laminar for run traces and debugging",
+      "description": "Capture end-to-end traces for browser-use runs and expose them for debugging and reliability analysis",
+      "acceptanceCriteria": [
+        "Each demo generation run emits Laminar trace data",
+        "Trace links are associated with run records in Convex metadata",
+        "Failures include Laminar trace references in PR comment or Claude response",
+        "Trace data captures tool steps, browser actions, and error points"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Laminar provides observability for agent workflows"
+    },
+    {
+      "id": "US-012",
+      "title": "Integrate Supermemory for cross-run context",
+      "description": "Use Supermemory to persist and retrieve relevant prior run context that improves route selection and interaction planning",
+      "acceptanceCriteria": [
+        "Store summarized run context and tested areas into Supermemory",
+        "Retrieve relevant prior context using branch, route, or component similarity",
+        "Use retrieved context to refine browser-use navigation/interaction plan",
+        "Allow disabling Supermemory retrieval for deterministic baseline runs"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Supermemory enhances agent context engineering across sessions"
+    },
+    {
+      "id": "US-013",
+      "title": "Email final demo results via AgentMail",
+      "description": "Send run completion emails with dashboard and media links through AgentMail",
+      "acceptanceCriteria": [
+        "On completion (success or failure), send an email summary via AgentMail",
+        "Email includes dashboard run URL, status, and short tested-areas summary",
+        "For PR-triggered runs, include PR link and final bot comment link in email",
+        "Email delivery failures are logged and surfaced in run status metadata"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Applies to both Claude skill runs and PR automation runs"
+    },
+    {
+      "id": "US-014",
+      "title": "In-dashboard post-editing like Screen Studio",
+      "description": "Allow users to edit generated videos after creation directly inside the dashboard with a feature-rich editor",
+      "acceptanceCriteria": [
+        "Users can crop regions of the video after generation and preview results before saving",
+        "Users can trim/split timeline sections and reorder or remove segments",
+        "Users can adjust cursor emphasis, zoom intensity, and motion smoothing in post-processing",
+        "Users can apply and tweak style presets to achieve Screen Studio-like polish",
+        "Editing operations are non-destructive, with ability to revert to the original render",
+        "Edited versions are saved as new versioned artifacts linked to the original run"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Editor should be powerful and production-grade, not a minimal crop-only tool"
+    },
+    {
+      "id": "US-015",
+      "title": "Advanced export controls (MP4, GIF, FPS, quality)",
+      "description": "Provide export options from the dashboard for multiple formats and rendering quality settings",
+      "acceptanceCriteria": [
+        "Users can export edited videos as MP4 and GIF",
+        "Users can select FPS (for example: 24/30/60) and output resolution",
+        "Users can control bitrate/quality and output file size constraints",
+        "Exports support preset profiles (Web share, high quality, lightweight preview)",
+        "Export jobs show progress, ETA, success/failure status, and downloadable outputs",
+        "Export metadata and files are persisted in Convex-linked run records"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Use sane defaults but expose advanced controls for power users"
+    },
+    {
+      "id": "US-016",
+      "title": "AWS-accelerated video processing pipeline",
+      "description": "Use AWS infrastructure for scalable render/transcode/edit processing when available",
+      "acceptanceCriteria": [
+        "Video edit and export jobs can run on AWS-backed workers for scalability",
+        "Pipeline supports queueing, retries, idempotency keys, and dead-letter handling",
+        "System can optionally use hardware-accelerated transcoding where available",
+        "Processing status events stream back to dashboard and PR/skill status surfaces",
+        "If AWS processing is unavailable, system falls back to a local/Daytona-compatible path",
+        "Cost and processing telemetry are captured per job for optimization and credit tracking"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "AWS credits should be leveraged for heavy video workloads and faster export turnaround"
     }
   ]
 }
