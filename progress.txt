@@ -1,0 +1,21 @@
+## Codebase Patterns
+- Claude Code custom skills go in `.claude/commands/<skill-name>.md` at project root
+- Monorepo uses Turborepo with `apps/` and `packages/` workspaces
+- Existing Python demo-recorder in `packages/demo-recorder/` — PRD requires TypeScript-only for core flow
+- Project uses npm (not yarn/pnpm), see `package-lock.json`
+- Quality checks: `turbo run build`, `turbo run lint`, `turbo run check-types`
+
+---
+
+## 2026-02-28 - US-001
+- Created `/record-demo` Claude Code skill at `.claude/commands/record-demo.md`
+- Skill is discoverable via `/record-demo` command (confirmed in skill listing)
+- Contains full placeholder prompt structure: diff analysis, web app detection, dev server startup, browser-use recording, Screen Studio-style post-processing, and output reporting
+- TypeScript-only baseline — no Python runtime dependency in the skill prompt
+- Files changed: `.claude/commands/record-demo.md` (new)
+- **Learnings for future iterations:**
+  - Claude Code discovers skills from `.claude/commands/` directory automatically
+  - The skill appears in the available skills list immediately after file creation
+  - Existing `packages/plugin/skills/record-demo/SKILL.md` is the old Python-based version; the new `.claude/commands/record-demo.md` supersedes it
+  - PRD says `~/.claude/commands/` (home dir) but project-level `.claude/commands/` is correct for project-scoped skills
+---

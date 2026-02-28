@@ -14,7 +14,7 @@
         "Implementation baseline is TypeScript-only (Node.js/TS), with no Python runtime dependency for core flow"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Check Claude Code docs for skill file format"
     },
     {
