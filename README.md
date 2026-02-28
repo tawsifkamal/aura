@@ -1,36 +1,75 @@
 # Aura
 
-Autonomous build loop for Claude Code. Give it a hackathon idea, it builds the product iteratively.
+Claude Code plugin that auto-generates video demos of your web app changes.
+
+## What it does
+
+```
+You code → /record-demo → Aura analyzes diff → Opens browser →
+Interacts with changes → Screenshots/video → Ready for PR
+```
+
+## Monorepo Structure
+
+```
+aura/
+├── apps/
+│   └── web/              # Sample Next.js app for testing
+├── packages/
+│   ├── plugin/           # Claude Code plugin
+│   │   ├── .claude-plugin/
+│   │   │   └── plugin.json
+│   │   ├── skills/
+│   │   │   └── record-demo/
+│   │   │       └── SKILL.md
+│   │   └── .mcp.json
+│   ├── ui/               # Shared UI components
+│   └── ...
+├── plan.md               # Full architecture
+├── prd.json              # Current phase tasks
+└── ralph.sh              # Autonomous build loop
+```
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Run the demo app
+npm run dev
+
+# Load the plugin in Claude Code
+claude --plugin-dir ./packages/plugin
+```
 
 ## Usage
 
-1. **Edit `idea.md`** with your hackathon idea
-2. **Run the loop:**
-   ```bash
-   ./aura-loop.sh
-   ```
-
-## How it works
-
+After making changes to a web app:
 ```
-idea.md → Claude Code → builds → NEXT_STEPS.md → Claude Code → builds more → ...
+/record-demo
 ```
 
-- Reads your idea from `idea.md`
-- Runs Claude Code with autonomous build instructions
-- Claude writes progress to `NEXT_STEPS.md`
-- Loop uses that to inform next iteration
-- Continues until complete or max iterations (default: 10)
+Aura will:
+1. Analyze your git diff
+2. Start your dev server
+3. Navigate to affected routes
+4. Interact with changed components
+5. Save screenshots to `./demos/[timestamp]/`
 
-## Configuration
+## Development
 
 ```bash
-MAX_ITERATIONS=20 ./aura-loop.sh  # More iterations
+npm run dev      # Start all apps
+npm run build    # Build all packages
+npm run lint     # Lint everything
 ```
 
-## Files
+## Roadmap
 
-- `idea.md` - Your hackathon idea (edit this)
-- `aura-loop.sh` - The loop script
-- `NEXT_STEPS.md` - Auto-generated progress tracker
-- `aura-log.md` - Full build log
+- [x] Phase 1: Local Playwright MVP
+- [ ] Phase 2: Browser-use support
+- [ ] Phase 3: Cloud upload (shareable links)
+- [ ] Phase 4: UI element caching
+
+See [plan.md](./plan.md) for full architecture.

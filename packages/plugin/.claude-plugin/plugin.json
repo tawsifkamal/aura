@@ -1,0 +1,10 @@
+{
+  "name": "aura",
+  "version": "0.1.0",
+  "description": "Auto-generate video demos of web app changes. Analyzes git diff, launches browser, records interactions.",
+  "author": {
+    "name": "tawsifkamal"
+  },
+  "repository": "github:tawsifkamal/aura",
+  "keywords": ["video", "demo", "pr", "browser", "playwright", "recording"]
+}
