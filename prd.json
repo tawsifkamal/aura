@@ -1,7 +1,7 @@
 {
   "project": "Aura",
   "branchName": "main",
-  "description": "Claude Code skill that auto-generates video demos of web app changes using Playwright",
+  "description": "Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using browser-use, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, and email results via AgentMail",
   "userStories": [
     {
       "id": "US-001",
@@ -24,7 +24,8 @@
         "Prompt instructs Claude to run git diff",
         "Detect if project is web app (package.json with react/vue/next/vite)",
         "Extract list of changed component/page files",
-        "Identify likely affected routes from file paths"
+        "Identify likely affected routes from file paths",
+        "Use code diffs as context to determine which frontend surfaces the browser agent should navigate to"
       ],
       "priority": 2,
       "passes": false,
@@ -46,17 +47,19 @@
     },
     {
       "id": "US-004",
-      "title": "Navigate and record with Playwright",
-      "description": "Use Playwright MCP to browse the app and record video",
+      "title": "Navigate and record with browser-use",
+      "description": "Use the browser-use agent to browse the app and record video",
       "acceptanceCriteria": [
-        "Prompt instructs Claude to use browser_navigate to open app",
+        "Prompt instructs Claude to use the browser-use agent to open app routes",
+        "Integrate browser-use runs with Laminar tracing/observability",
+        "Integrate browser-use runs with Supermemory so prior runs and route intelligence can be recalled",
         "Visit routes affected by changes",
         "Take screenshots or record interactions",
         "Save output to demos/ folder with timestamp"
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Relies on user having Playwright MCP configured"
+      "notes": "Relies on browser-use agent and browser tooling being configured"
     },
     {
       "id": "US-005",
@@ -66,7 +69,7 @@
         "Prompt tells Claude to read the actual code changes",
         "Identify interactive elements (buttons, forms, etc.) that changed",
         "Generate interaction plan",
-        "Execute interactions via Playwright MCP"
+        "Execute interactions via browser-use"
       ],
       "priority": 5,
       "passes": false,
@@ -74,17 +77,121 @@
     },
     {
       "id": "US-006",
-      "title": "Generate summary with video/screenshots",
-      "description": "Output a summary of what was tested with media",
+      "title": "Generate Screen Studio-style video and summary",
+      "description": "Output a cinematic demo video and summary of what was tested with media",
       "acceptanceCriteria": [
         "Create demos/[timestamp]/ folder",
+        "Produce Screen Studio-style video output with smooth zoom-in emphasis on click/type actions",
+        "Render a synthetic smooth cursor animation between interaction targets instead of relying on raw browser cursor movement",
+        "Cursor animation path and timing should be deterministic and visually smooth across steps",
         "Save screenshots of each step",
         "Generate summary.md with what was tested",
         "Print path to user when done"
       ],
       "priority": 6,
       "passes": false,
-      "notes": "User can attach this to PR"
+      "notes": "Requires post-processing layer for zoom and cursor interpolation effects"
+    },
+    {
+      "id": "US-007",
+      "title": "Upload generated videos to dashboard",
+      "description": "All generated demo videos should be uploaded to a dashboard page that can be shared",
+      "acceptanceCriteria": [
+        "Create a dashboard page that lists uploaded demo videos",
+        "Use Convex as the primary database for run metadata and dashboard indexing",
+        "Use Convex storage for uploaded demo videos and related media artifacts",
+        "Each upload stores metadata: timestamp, branch/PR, commit SHA, and summary",
+        "Each generated run returns a stable dashboard URL for the uploaded video",
+        "Dashboard supports both Claude skill runs and PR-triggered runs"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Dashboard is the canonical location for all demo artifacts, backed by Convex"
+    },
+    {
+      "id": "US-008",
+      "title": "Claude skill response includes dashboard link",
+      "description": "When used through the Claude skill, Claude replies with the dashboard page URL for the generated video",
+      "acceptanceCriteria": [
+        "After a successful skill run, Claude response includes the dashboard link",
+        "Response also includes short summary of what was recorded",
+        "Link points to the specific uploaded run, not only the dashboard root"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Optimizes handoff from local skill execution to shareable artifact"
+    },
+    {
+      "id": "US-009",
+      "title": "PR bot uploads to dashboard and comments with live status",
+      "description": "For pull requests, GitHub bot uploads videos to dashboard, embeds video in PR comment, and continuously updates that same comment with live status",
+      "acceptanceCriteria": [
+        "On PR open/update, bot triggers demo generation using code diff as navigation context",
+        "Bot uploads resulting video to the dashboard and captures dashboard link",
+        "Bot posts a PR comment containing embedded video preview plus dashboard link",
+        "Bot uses a single persistent PR comment that is edited in place for status updates",
+        "Status lifecycle includes queued, running, uploading, completed, and failed states",
+        "Final comment includes summary of tested frontend areas inferred from diff"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Avoid comment spam by continuously editing one canonical bot comment"
+    },
+    {
+      "id": "US-010",
+      "title": "Run recording pipeline in Daytona sandbox",
+      "description": "Execute the demo generation workflow inside Daytona sandbox environments for isolation and reproducibility",
+      "acceptanceCriteria": [
+        "Recording pipeline runs in a Daytona sandbox for both Claude skill and PR bot flows",
+        "Sandbox image includes browser-use dependencies and video rendering toolchain",
+        "Artifacts can be exported from the sandbox to Convex storage/dashboard pipeline",
+        "Pipeline can be resumed or retried without losing run state metadata"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Daytona is the default execution runtime for untrusted or variable project code"
+    },
+    {
+      "id": "US-011",
+      "title": "Integrate Laminar for run traces and debugging",
+      "description": "Capture end-to-end traces for browser-use runs and expose them for debugging and reliability analysis",
+      "acceptanceCriteria": [
+        "Each demo generation run emits Laminar trace data",
+        "Trace links are associated with run records in Convex metadata",
+        "Failures include Laminar trace references in PR comment or Claude response",
+        "Trace data captures tool steps, browser actions, and error points"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Laminar provides observability for agent workflows"
+    },
+    {
+      "id": "US-012",
+      "title": "Integrate Supermemory for cross-run context",
+      "description": "Use Supermemory to persist and retrieve relevant prior run context that improves route selection and interaction planning",
+      "acceptanceCriteria": [
+        "Store summarized run context and tested areas into Supermemory",
+        "Retrieve relevant prior context using branch, route, or component similarity",
+        "Use retrieved context to refine browser-use navigation/interaction plan",
+        "Allow disabling Supermemory retrieval for deterministic baseline runs"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Supermemory enhances agent context engineering across sessions"
+    },
+    {
+      "id": "US-013",
+      "title": "Email final demo results via AgentMail",
+      "description": "Send run completion emails with dashboard and media links through AgentMail",
+      "acceptanceCriteria": [
+        "On completion (success or failure), send an email summary via AgentMail",
+        "Email includes dashboard run URL, status, and short tested-areas summary",
+        "For PR-triggered runs, include PR link and final bot comment link in email",
+        "Email delivery failures are logged and surfaced in run status metadata"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Applies to both Claude skill runs and PR automation runs"
     }
   ]
 }
