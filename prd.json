@@ -1,0 +1,90 @@
+{
+  "project": "Aura",
+  "branchName": "main",
+  "description": "Claude Code skill that auto-generates video demos of web app changes using Playwright",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create basic skill file structure",
+      "description": "Set up the Claude Code skill that can be invoked with /record-demo",
+      "acceptanceCriteria": [
+        "Create skill file at ~/.claude/commands/record-demo.md",
+        "Skill is discoverable via /record-demo command",
+        "Skill contains placeholder prompt structure"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Check Claude Code docs for skill file format"
+    },
+    {
+      "id": "US-002",
+      "title": "Detect web app and changed files",
+      "description": "Skill prompts Claude to analyze git diff and identify what changed",
+      "acceptanceCriteria": [
+        "Prompt instructs Claude to run git diff",
+        "Detect if project is web app (package.json with react/vue/next/vite)",
+        "Extract list of changed component/page files",
+        "Identify likely affected routes from file paths"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Focus on React/Next.js apps first"
+    },
+    {
+      "id": "US-003",
+      "title": "Start dev server and wait for ready",
+      "description": "Skill prompts Claude to start the dev server before recording",
+      "acceptanceCriteria": [
+        "Detect start script from package.json (dev, start, etc.)",
+        "Start server in background",
+        "Wait for server to be ready (poll localhost)",
+        "Handle common ports (3000, 5173, 8080)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Use Bash tool for server, need to handle cleanup"
+    },
+    {
+      "id": "US-004",
+      "title": "Navigate and record with Playwright",
+      "description": "Use Playwright MCP to browse the app and record video",
+      "acceptanceCriteria": [
+        "Prompt instructs Claude to use browser_navigate to open app",
+        "Visit routes affected by changes",
+        "Take screenshots or record interactions",
+        "Save output to demos/ folder with timestamp"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Relies on user having Playwright MCP configured"
+    },
+    {
+      "id": "US-005",
+      "title": "AI-driven interaction based on diff",
+      "description": "Claude analyzes the diff and decides what to click/test",
+      "acceptanceCriteria": [
+        "Prompt tells Claude to read the actual code changes",
+        "Identify interactive elements (buttons, forms, etc.) that changed",
+        "Generate interaction plan",
+        "Execute interactions via Playwright MCP"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "This is the smart part - Claude reads diff and decides actions"
+    },
+    {
+      "id": "US-006",
+      "title": "Generate summary with video/screenshots",
+      "description": "Output a summary of what was tested with media",
+      "acceptanceCriteria": [
+        "Create demos/[timestamp]/ folder",
+        "Save screenshots of each step",
+        "Generate summary.md with what was tested",
+        "Print path to user when done"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "User can attach this to PR"
+    }
+  ]
+}
