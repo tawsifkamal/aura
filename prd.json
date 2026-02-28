@@ -1,7 +1,7 @@
 {
   "project": "Aura",
   "branchName": "main",
-  "description": "TypeScript-only Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using the browser-use TypeScript library, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, and email results via AgentMail",
+  "description": "TypeScript-only Claude Code skill and PR bot that auto-generate Screen Studio-style demo videos of frontend changes using the browser-use TypeScript library, run in Daytona sandboxes, integrate Laminar and Supermemory for browser intelligence/observability/context, store data and videos in Convex, upload to a dashboard, comment live status on GitHub, email results via AgentMail, and deliver videos to user-linked channels (Slack, Discord, etc.) via Composio with conversational editing support",
   "userStories": [
     {
       "id": "US-001",
@@ -189,32 +189,35 @@
     {
       "id": "US-013",
       "title": "Email final demo results via AgentMail",
-      "description": "Send run completion emails with dashboard and media links through AgentMail",
+      "description": "Send run completion emails with dashboard and media links through AgentMail as the default email delivery channel. AgentMail is one delivery channel among many; Composio handles routing to user-linked platforms (Slack, Discord, etc.)",
       "acceptanceCriteria": [
         "On completion (success or failure), send an email summary via AgentMail",
-        "Email includes dashboard run URL, status, and short tested-areas summary",
+        "Email includes dashboard run URL, embedded or linked video, status, and short tested-areas summary",
         "For PR-triggered runs, include PR link and final bot comment link in email",
-        "Email delivery failures are logged and surfaced in run status metadata"
+        "Email delivery failures are logged and surfaced in run status metadata",
+        "AgentMail acts as the default email channel; delivery to other platforms is handled by Composio (see US-018)"
       ],
       "priority": 13,
       "passes": false,
-      "notes": "Applies to both Claude skill runs and PR automation runs"
+      "notes": "AgentMail is the email-specific channel. For Slack, Discord, and other platforms, delivery is routed through Composio integration (US-018)"
     },
     {
       "id": "US-014",
       "title": "In-dashboard post-editing like Screen Studio",
-      "description": "Allow users to edit generated videos after creation directly inside the dashboard with a feature-rich editor",
+      "description": "Allow users to edit generated videos after creation directly inside the dashboard with a feature-rich editor. All editing operations are backed by a shared backend API so the same capabilities are accessible from both the dashboard GUI and external integrations (Composio conversational edits)",
       "acceptanceCriteria": [
         "Users can crop regions of the video after generation and preview results before saving",
         "Users can trim/split timeline sections and reorder or remove segments",
         "Users can adjust cursor emphasis, zoom intensity, and motion smoothing in post-processing",
         "Users can apply and tweak style presets to achieve Screen Studio-like polish",
         "Editing operations are non-destructive, with ability to revert to the original render",
-        "Edited versions are saved as new versioned artifacts linked to the original run"
+        "Edited versions are saved as new versioned artifacts linked to the original run",
+        "All editing operations are exposed via a backend API consumable by both the dashboard UI and external integrations (Composio)",
+        "Backend editing API supports crop, trim, split, zoom, cursor emphasis, and style preset operations"
       ],
       "priority": 14,
       "passes": false,
-      "notes": "Editor should be powerful and production-grade, not a minimal crop-only tool"
+      "notes": "Editor should be powerful and production-grade, not a minimal crop-only tool. The backend API is the single source of truth for edits — the dashboard GUI and Composio conversational edits (US-019) both call it"
     },
     {
       "id": "US-015",
@@ -247,6 +250,57 @@
       "priority": 16,
       "passes": false,
       "notes": "AWS credits should be leveraged for heavy video workloads and faster export turnaround"
+    },
+    {
+      "id": "US-017",
+      "title": "CI app and webhook server for PR-triggered runs",
+      "description": "Build a GitHub App that receives PR webhook events and dispatches demo generation pipeline jobs. This is the trigger mechanism for all PR-automated flows",
+      "acceptanceCriteria": [
+        "Register and configure a GitHub App with PR event webhook permissions",
+        "Webhook server receives PR open/update/synchronize events and validates signatures",
+        "Server dispatches pipeline jobs to Daytona sandbox (or local fallback) with PR metadata (repo, branch, commit SHA, diff)",
+        "Job state is tracked in Convex with status lifecycle: queued, running, uploading, completed, failed",
+        "Server updates the persistent PR comment (US-009) with live status as the job progresses",
+        "Supports retry/re-run via PR comment command or dashboard action",
+        "Webhook server is deployable as a standalone service (e.g., Node.js on Fly.io, Railway, or AWS)"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "This is the backbone of the PR automation flow. US-009 depends on this for the actual trigger mechanism"
+    },
+    {
+      "id": "US-018",
+      "title": "Composio integration for multi-channel delivery",
+      "description": "Integrate Composio to deliver completed demo videos to whatever channels the user has linked — Slack, Discord, email, or other platforms. Users configure their preferred delivery channels and Composio routes results accordingly",
+      "acceptanceCriteria": [
+        "Integrate Composio SDK for multi-channel delivery routing",
+        "Users can link delivery channels (Slack, Discord, email, etc.) via Composio OAuth/connection flows",
+        "Delivery preferences are stored per-user (or per-repo) in Convex",
+        "On pipeline completion, video and summary are delivered to all user-linked channels via Composio",
+        "Delivery includes dashboard link, video embed/attachment (where supported), and run summary",
+        "Fallback to AgentMail email (US-013) if no Composio channels are linked",
+        "Delivery failures per channel are logged and surfaced in run metadata without blocking other channels"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "Composio is the routing layer for non-email delivery. AgentMail (US-013) handles email specifically. Users should be able to receive videos wherever they work"
+    },
+    {
+      "id": "US-019",
+      "title": "Conversational video editing via Composio channels",
+      "description": "Allow users to reply to delivered demo videos with natural language edit requests through their linked channel (Slack, Discord, etc.). Edit prompts are routed back to the editing API (US-014) and the updated video is re-delivered",
+      "acceptanceCriteria": [
+        "Users can reply to a delivered video in their channel (Slack thread, Discord reply, email reply) with edit instructions",
+        "Composio routes the reply back to the Aura server with the original run context",
+        "Server parses natural language edit requests (e.g., 'zoom in on the button click', 'trim the first 5 seconds', 'make it a GIF')",
+        "Edit requests are translated into calls to the backend editing API (US-014)",
+        "Updated video is re-rendered and re-delivered through the same channel",
+        "Edit history is tracked as versioned artifacts in Convex, linked to the original run",
+        "Users can request multiple rounds of edits in a conversational thread"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "This is the conversational counterpart to the dashboard GUI editor (US-014). Both use the same backend editing API. The NLP parsing layer translates free-text prompts into structured edit operations"
     }
   ]
 }
