@@ -248,7 +248,7 @@
         "Cost and processing telemetry are captured per job for optimization and credit tracking"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "AWS credits should be leveraged for heavy video workloads and faster export turnaround"
     },
     {
