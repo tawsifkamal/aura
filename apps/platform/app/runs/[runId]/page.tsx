@@ -1,8 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import type { RunDetail } from "../../types";
+import { getRun, type RunDetail } from "../../api-client";
+import { useApi } from "../../hooks";
 import Link from "next/link";
 import { use } from "react";
 import styles from "./page.module.css";
@@ -31,9 +30,7 @@ export default function RunDetailPage(props: {
   params: Promise<{ runId: string }>;
 }) {
   const { runId } = use(props.params);
-  const run = useQuery(api.runs.get, {
-    id: runId as never,
-  }) as RunDetail | null | undefined;
+  const run = useApi<RunDetail | null>(() => getRun(runId).catch(() => null), [runId]);
 
   if (run === undefined) {
     return (

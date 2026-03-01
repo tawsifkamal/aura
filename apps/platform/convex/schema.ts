@@ -22,6 +22,19 @@ export default defineSchema({
     durationMs: v.optional(v.number()),
     error: v.optional(v.string()),
     traceId: v.optional(v.string()),
+    annotationSections: v.optional(
+      v.array(
+        v.object({
+          task: v.string(),
+          path: v.string(),
+          startMs: v.number(),
+          endMs: v.number(),
+          x: v.number(),
+          y: v.number(),
+        }),
+      ),
+    ),
+    subtitlesVtt: v.optional(v.string()),
   })
     .index("by_timestamp", ["timestamp"])
     .index("by_status", ["status"])
