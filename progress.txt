@@ -333,3 +333,31 @@
   - Regex match groups from `match()` can be `undefined` even within a successful match — use optional chaining `?.[1]`
   - Re-delivery after edit uses `deliverToAllChannels()` with a filtered single-channel preferences object
 ---
+
+## 2026-02-28 - US-020
+- Set up Vitest testing infrastructure for `packages/core`: `vitest.config.ts`, `"test": "vitest run"` script, turbo `test` task
+- Created 9 comprehensive test files covering all major pipeline modules:
+  - `diff-analyzer.test.ts` (11 tests): parseDiffNameStatus parsing, file classification (component/page/route/extension)
+  - `route-inferrer.test.ts` (9 tests): App Router / Pages Router route inference, deduplication, confidence, navigation plan
+  - `interaction-planner.test.ts` (12 tests): extracting interactive elements from git diffs, generating interaction plans
+  - `video-processor.test.ts` (24 tests): easing functions, cursor interpolation, zoom keyframes, FFmpeg command gen, filters
+  - `pr-bot.test.ts` (8 tests): comment body rendering, status lifecycle, marker format
+  - `convex-uploader.test.ts` (6 tests): Convex HTTP API calls for run creation and status updates
+  - `composio-delivery.test.ts` (11 tests): multi-channel delivery, fallback logic, webhook channels, connection URLs
+  - `conversational-edit.test.ts` (24 tests): NLP parsing for trim/zoom/crop/split/style/cursor/export operations
+  - `aws-pipeline.test.ts` (18 tests): config loading, MediaConvert job spec, cost estimation, retry logic, telemetry
+- All 123 tests pass, all quality checks (build, typecheck, lint) pass
+- Tests use mocks/stubs for external services (fetch, env vars) and run fully offline
+- Files changed: `packages/core/vitest.config.ts` (new), `packages/core/package.json`, `turbo.json`, 9 test files in `packages/core/src/`
+- **Learnings for future iterations:**
+  - Always read source files before writing tests — function signatures and types differ from what you might assume
+  - `getChangedFiles()` and `analyzeDiff()` run git commands internally — can't unit test with data inputs, test `parseDiffNameStatus()` instead
+  - `inferRoutes()` requires `framework: Framework` as second param — tests must provide it
+  - `InferredRoute` uses `route` field (not `path`), `InteractiveElement` uses `sourceFile` (not `file`)
+  - `extractInteractiveElements()` takes full git diff string format, not a dict of hunks
+  - `generateInteractionPlan()` takes `(diff, routes)`, not `(elements, routes)` — it calls extractInteractiveElements internally
+  - `getEasing()` returns a function `(t: number) => number`, doesn't take `t` as parameter
+  - `CursorKeyframe` has `{ position: Point, timestamp, action }`, not `{ x, y, time }`
+  - `generateZoomKeyframes()` takes `(steps, cursorKeyframes, preset)` — 3 args
+  - `buildFFmpegCompositeCommand()` returns `FFmpegCommand` object `{ executable, args, description }`, not a string array
+---
