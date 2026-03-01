@@ -20,7 +20,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
 RUN curl -fsSL https://opencode.ai/install | bash
 
 # Cache-bust: change this value to force re-pull from GitHub
-ARG CACHE_BUST=20260301_blackdetect_trim
+ARG CACHE_BUST=20260301_hardcoded_trim
 
 # Install demo-recorder from GitHub + browser-use video support
 RUN pip install --no-cache-dir "git+https://github.com/tawsifkamal/aura.git#subdirectory=packages/demo-recorder" && \

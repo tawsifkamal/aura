@@ -414,29 +414,10 @@ async def run_tasks(
             stop_screen_recording(ffmpeg_proc)
             ffmpeg_proc = None
 
-        # ── Trim dark loading screen from start of video ──
-        # Use FFmpeg blackdetect to find when the dark browser-use splash ends
-        # and the bright page appears (dark→light transition).
-        trim_offset_sec = 0.0
-        if use_xvfb:
-            try:
-                detect_result = subprocess.run(
-                    [
-                        "ffmpeg", "-i", str(video_path),
-                        "-vf", "blackdetect=d=0.5:pix_th=0.10:pic_th=0.85",
-                        "-an", "-f", "null", "-",
-                    ],
-                    capture_output=True, text=True, timeout=30,
-                )
-                # Parse black_end from stderr — last black period ending is our trim point
-                for line in detect_result.stderr.split("\n"):
-                    m = re.search(r"black_end:\s*([\d.]+)", line)
-                    if m:
-                        trim_offset_sec = float(m.group(1))
-                print(f"  blackdetect trim offset: {trim_offset_sec:.2f}s")
-            except (subprocess.TimeoutExpired, Exception) as e:
-                print(f"  blackdetect failed ({e}), no trim")
-                trim_offset_sec = 0.0
+        # ── Trim loading screen from start of video ──
+        # Hardcoded 6.5s delay for browser-use splash screen
+        trim_offset_sec = 6.5 if use_xvfb else 0.0
+        print(f"  Trim offset: {trim_offset_sec:.2f}s")
 
         if use_xvfb and trim_offset_sec > 1.0:
             trimmed_path = output_dir / "trimmed.mp4"
