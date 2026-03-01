@@ -111,7 +111,7 @@
         "Dashboard supports both Claude skill runs and PR-triggered runs"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Dashboard is the canonical location for all demo artifacts, backed by Convex, with a clean black-and-white editorial UI style"
     },
     {

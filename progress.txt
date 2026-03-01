@@ -7,6 +7,11 @@
 - New Node.js packages: extend `@repo/typescript-config/base.json`, add `eslint.config.js` with `@repo/eslint-config/base`, set `type: "module"`
 - Core utilities live in `packages/core/src/` — import with `@repo/core` or `@repo/core/<module>`
 - ESLint `--max-warnings 0` means NO unused vars allowed (even with `_` prefix) — remove unused params entirely
+- Convex backend lives in `apps/web/convex/` — schema in `schema.ts`, functions in `runs.ts`
+- Convex `_generated/` uses `GenericDataModel` — cast query results to app types on the client side
+- Exclude `convex/_generated/**` in ESLint config to avoid lint errors on auto-generated files
+- Dashboard UI at `apps/web/` — strict B&W theme, sharp edges, CSS Modules, responsive grid
+- Upload utility in `packages/core/src/convex-uploader.ts` — uses Convex HTTP API for uploads from CLI/pipeline
 
 ---
 
@@ -110,4 +115,26 @@
   - FFmpeg `-movflags +faststart` is essential for web playback (moves moov atom to start)
   - `zoompan` filter in FFmpeg can do per-frame zoom but syntax is complex for dynamic keyframes
   - Render manifest JSON captures all processing metadata for debugging and reproducibility
+---
+
+## 2026-02-28 - US-007
+- Created Convex backend for dashboard: schema with `runs` table (indexes: by_timestamp, by_status, by_branch)
+- Convex functions: `list`, `get`, `create`, `updateStatus`, `attachVideo`, `attachScreenshots`, `generateUploadUrl`
+- Dashboard homepage (`apps/web/app/page.tsx`): grid of run cards with status badges, video thumbnails, route chips
+- Run detail page (`apps/web/app/runs/[runId]/page.tsx`): video player, metadata grid, summary, screenshots, error display
+- Strict black-and-white visual theme with sharp edges (border-radius: 0), no color gradients
+- Responsive layout: 3-col desktop, 2-col tablet, 1-col mobile via CSS Grid `auto-fill`
+- ConvexClientProvider wraps the app in layout.tsx
+- Created `convex-uploader.ts` in `packages/core/src/` for pipeline uploads via Convex HTTP API
+- Updated skill prompt with Step 5f (upload to dashboard) and dashboard link in output
+- Excluded `convex/_generated/**` from ESLint to avoid warnings on auto-generated files
+- Files changed: `apps/web/convex/` (new), `apps/web/app/` (rewritten), `apps/web/eslint.config.js`, `apps/web/package.json`, `packages/core/src/convex-uploader.ts` (new), `packages/core/src/index.ts`, `.claude/commands/record-demo.md`, `package-lock.json`
+- **Learnings for future iterations:**
+  - Convex `_generated/server.d.ts` uses `GenericDataModel` — query return types lose schema info, so cast to app-defined types on the client
+  - Use `RegisteredMutation` type annotation for mutations with inferred return types that reference internal Convex types (avoids TS2742)
+  - Convex storage upload flow: generate upload URL via mutation → POST file to URL → get storageId → attach to document
+  - Next.js 16 uses `params: Promise<...>` for dynamic routes — unwrap with `use(props.params)`
+  - CSS Modules `composes` works for badge variants but the composed class must be defined in the same file
+  - Convex local dev runs on port 3210 (HTTP API) and 3211 (site URL)
+  - Root `convex/` directory is created by `npx convex dev` when run from monorepo root — don't commit it
 ---
