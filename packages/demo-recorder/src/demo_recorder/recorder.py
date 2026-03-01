@@ -47,22 +47,35 @@ class DemoRecorder:
     async def record(
         self,
         task: str | None = None,
+        prompt: str | None = None,
         max_steps: int = 10,
         base_ref: str = "HEAD~1",
     ) -> Path:
         changes: list[UIChange] = []
 
         if task is None:
-            changes, task = self.analyzer.analyze(base_ref)
-            if not task or task == "Navigate to http://localhost:3000.":
-                task = f"""
-                Navigate to {self.base_url}.
-                Explore the page by scrolling and clicking interactive elements.
-                Click any buttons you find.
-                If there are forms, fill them with test data.
-                Navigate to any visible links.
-                Take 2 seconds between each action.
-                """
+            changes, auto_task = self.analyzer.analyze(base_ref)
+            change_summary = self.analyzer.summarize_changes(changes)
+
+            if prompt:
+                # Main agent provided context — fuse it with git diff hints
+                task = (
+                    f"{prompt.strip()}\n\n"
+                    f"Git diff context:\n{change_summary}\n\n"
+                    f"Start at {self.base_url}. "
+                    f"Take 2 seconds between actions for visibility."
+                )
+            else:
+                task = auto_task
+                if not task or task == f"Navigate to {self.base_url}.":
+                    task = (
+                        f"Navigate to {self.base_url}. "
+                        f"Explore the page by scrolling and clicking interactive elements. "
+                        f"Click any buttons you find. "
+                        f"If there are forms, fill them with test data. "
+                        f"Navigate to any visible links. "
+                        f"Take 2 seconds between each action."
+                    )
 
         print(f"Recording demo to: {self.output_dir}")
         print(f"Task: {task}")
@@ -84,17 +97,23 @@ class DemoRecorder:
         await agent.run(max_steps=max_steps)
 
         # Generate summary
-        self._write_summary(changes, task)
+        self._write_summary(changes, task, prompt=prompt)
 
         print(f"Demo recorded to: {self.output_dir}")
         return self.output_dir
 
-    def _write_summary(self, changes: list[UIChange], task: str) -> None:
+    def _write_summary(self, changes: list[UIChange], task: str, prompt: str | None = None) -> None:
         summary_path = self.output_dir / "summary.md"
 
         lines = [
             f"# Demo Recording - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "",
+        ]
+
+        if prompt:
+            lines += ["## Agent Prompt", prompt, ""]
+
+        lines += [
             "## Task",
             task,
             "",
@@ -130,6 +149,7 @@ async def record_demo(
     output_dir: str | None = None,
     base_url: str = "http://localhost:3000",
     task: str | None = None,
+    prompt: str | None = None,
     max_steps: int = 10,
     model: str = "browser-use",
 ) -> Path:
@@ -139,4 +159,4 @@ async def record_demo(
         base_url=base_url,
         model=model,
     )
-    return await recorder.record(task=task, max_steps=max_steps)
+    return await recorder.record(task=task, prompt=prompt, max_steps=max_steps)

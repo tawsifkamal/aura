@@ -107,6 +107,20 @@ class DiffAnalyzer:
 
         return "/"
 
+    def summarize_changes(self, changes: list[UIChange]) -> str:
+        """Return a concise bullet-list summary of UI changes for prompt synthesis."""
+        if not changes:
+            return "- No UI file changes detected in git diff."
+        lines = []
+        for c in changes:
+            line = f"- `{c.file_path}`"
+            if c.route:
+                line += f" (route: `{c.route}`)"
+            if c.interactions:
+                line += f" — detected elements: {', '.join(c.interactions)}"
+            lines.append(line)
+        return "\n".join(lines)
+
     def generate_task(self, changes: list[UIChange], base_url: str) -> str:
         task_parts = [f"Navigate to {base_url}"]
 
