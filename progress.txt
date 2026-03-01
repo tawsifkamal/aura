@@ -185,3 +185,44 @@
   - Parse artifact paths from stdout using regex pattern matching on "artifact:", "output:", etc.
   - Best-effort cleanup pattern: wrap destroy in try/catch, never throw on cleanup failure
 ---
+
+## 2026-02-28 - US-011
+- Created `laminar.ts` in `packages/core/src/` for OpenTelemetry-compatible tracing
+- `createTrace()`, `startSpan()`, `endSpan()`, `addSpanEvent()`, `endTrace()`: full trace lifecycle
+- `exportTrace()`: sends OTLP-formatted trace data to Laminar endpoint
+- `buildTraceUrl()`: constructs deep-link URL to trace in Laminar UI
+- `getLaminarConfig()`: reads from `LAMINAR_ENDPOINT`, `LAMINAR_API_KEY`, `LAMINAR_PROJECT_ID` env vars
+- Added all env vars to `turbo.json` `globalEnv` to satisfy `turbo/no-undeclared-env-vars` lint rule
+- Files changed: `packages/core/src/laminar.ts` (new), `packages/core/src/index.ts`, `turbo.json`
+- **Learnings for future iterations:**
+  - Turbo's `turbo/no-undeclared-env-vars` lint rule requires all `process.env` references to be in `turbo.json` `globalEnv`
+  - Add env vars proactively for upcoming modules (Supermemory, AgentMail, etc.) to avoid repeated turbo.json edits
+  - OTLP trace format uses nanosecond timestamps (multiply ms by 1_000_000)
+---
+
+## 2026-02-28 - US-012
+- Created `supermemory.ts` in `packages/core/src/` for cross-run context persistence
+- `storeRunContext()`: stores run summary, routes, components into Supermemory via API
+- `retrieveContext()`: semantic search for relevant prior runs by branch, routes, or components
+- `mergeContextIntoPrompt()`: appends retrieved context as structured prompt section
+- `getSupermemoryConfig()`: reads from `SUPERMEMORY_ENDPOINT`, `SUPERMEMORY_API_KEY` env vars
+- Retrieval can be disabled by not setting env vars (returns empty context gracefully)
+- Files changed: `packages/core/src/supermemory.ts` (new), `packages/core/src/index.ts`
+- **Learnings for future iterations:**
+  - Re-exported as `SupermemoryClientConfig` to avoid collision with existing `SupermemoryConfig` from browser-recorder
+  - Supermemory search API uses similarity scoring — merge into prompt sorted by relevance
+---
+
+## 2026-02-28 - US-013
+- Created `agentmail.ts` in `packages/core/src/` for email delivery via AgentMail API
+- `sendEmail()`: sends HTML+text email with dashboard URL, video link, PR references, summary
+- `getAgentMailConfig()`: reads from `AGENTMAIL_API_KEY`, `AGENTMAIL_FROM` env vars
+- Email includes status-specific content (completed: video+summary, failed: error details)
+- Delivery failures return structured `SendResult` with error message (never throws)
+- For PR-triggered runs, email includes PR link and bot comment link
+- Files changed: `packages/core/src/agentmail.ts` (new), `packages/core/src/index.ts`
+- **Learnings for future iterations:**
+  - AgentMail API endpoint is `https://api.agentmail.to/v1/messages`
+  - Always send both HTML and text versions for email compatibility
+  - Return structured error results instead of throwing — caller decides how to handle delivery failures
+---

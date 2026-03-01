@@ -169,7 +169,7 @@
         "Trace data captures tool steps, browser actions, and error points"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "Laminar provides observability for agent workflows"
     },
     {
@@ -183,7 +183,7 @@
         "Allow disabling Supermemory retrieval for deterministic baseline runs"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "Supermemory enhances agent context engineering across sessions"
     },
     {
@@ -198,7 +198,7 @@
         "AgentMail acts as the default email channel; delivery to other platforms is handled by Composio (see US-018)"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "AgentMail is the email-specific channel. For Slack, Discord, and other platforms, delivery is routed through Composio integration (US-018)"
     },
     {
