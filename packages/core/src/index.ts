@@ -155,3 +155,29 @@ export type {
   PipelineRunOptions,
   PipelineResult,
 } from "./sandbox.js";
+
+export {
+  getAWSPipelineConfig,
+  isAWSAvailable,
+  buildMediaConvertJobSpec,
+  submitTranscodeJob,
+  pollJobStatus,
+  runTranscodeJob,
+  estimateCost,
+  buildTelemetry,
+  buildLocalFallbackCommand,
+  buildDeadLetterMessage,
+  shouldRetry,
+  processVideoJob,
+} from "./aws-pipeline.js";
+export type {
+  AWSPipelineConfig,
+  JobPriority,
+  TranscodeJobRequest,
+  JobStatus,
+  TranscodeJobResult,
+  CostEstimate,
+  ProcessingTelemetry,
+  StatusCallback,
+  DeadLetterMessage,
+} from "./aws-pipeline.js";

@@ -256,3 +256,25 @@
   - Export jobs follow the same pattern as run status lifecycle but with their own progress/ETA tracking
   - Convex storage URLs for export outputs are resolved at query time using `ctx.storage.getUrl()`
 ---
+
+## 2026-02-28 - US-016
+- Created `aws-pipeline.ts` in `packages/core/src/` for AWS MediaConvert-backed video processing
+- `getAWSPipelineConfig()` / `isAWSAvailable()`: reads AWS env vars, returns null when unavailable (enables fallback)
+- `buildMediaConvertJobSpec()`: constructs full MediaConvert job JSON with codec settings, quality presets, HW acceleration
+- `submitTranscodeJob()` / `pollJobStatus()`: HTTP-based job submission and polling (no AWS SDK dependency)
+- `runTranscodeJob()`: full lifecycle with polling and status callbacks for streaming progress to dashboard
+- `processVideoJob()`: top-level entrypoint with retry logic (up to 3 retries) and automatic local FFmpeg fallback
+- `estimateCost()` / `buildTelemetry()`: per-job cost estimation and telemetry capture
+- `buildLocalFallbackCommand()`: generates FFmpeg command for local/Daytona processing when AWS is unavailable
+- `shouldRetry()` / `buildDeadLetterMessage()`: dead-letter handling with non-retryable error detection
+- Quality presets map to codec settings: preview (H.264 CBR), web (H.264 QVBR), high (H.265 QVBR)
+- Added AWS env vars to `turbo.json` `globalEnv`
+- Files changed: `packages/core/src/aws-pipeline.ts` (new), `packages/core/src/index.ts`, `turbo.json`
+- **Learnings for future iterations:**
+  - AWS MediaConvert REST API at `/2017-08-29/jobs` — can be called with HTTP fetch (no SDK needed)
+  - `IdempotencyToken` in job spec ensures duplicate submissions are safely deduplicated
+  - For GIF output, use `FrameCaptureSettings` instead of codec settings, cap FPS at 15
+  - `MoovPlacement: PROGRESSIVE_DOWNLOAD` is the MediaConvert equivalent of `-movflags +faststart`
+  - Cost estimation: basic tier ~$0.012/min (SD), professional ~$0.048/min (HD)
+  - Fallback pattern: check config → null means no AWS → fall back to local FFmpeg
+---
