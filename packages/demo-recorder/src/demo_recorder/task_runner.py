@@ -231,6 +231,7 @@ async def run_tasks(
         browser_session = Browser(
             headless=headless,
             record_video_dir=str(output_dir),
+            record_video_size={"width": 1920, "height": 1080},
         )
 
         llm = get_llm(model)

@@ -1,6 +1,6 @@
-FROM python:3.12-slim
+FROM python:3.12
 
-# System deps for Playwright + ffmpeg + git
+# System deps for Playwright + ffmpeg (full codec support) + git
 RUN apt-get update && apt-get install -y \
     git curl ffmpeg \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
@@ -20,7 +20,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN npm install -g @anthropic-ai/claude-code
 
 # Cache-bust: change this value to force re-pull from GitHub
-ARG CACHE_BUST=20260301024531
+ARG CACHE_BUST=20260301025151
 
 # Install demo-recorder from GitHub + browser-use video support
 RUN pip install --no-cache-dir "git+https://github.com/tawsifkamal/aura.git#subdirectory=packages/demo-recorder" && \
