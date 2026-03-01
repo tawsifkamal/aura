@@ -91,7 +91,7 @@
         "Print path to user when done"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Requires post-processing layer for zoom and cursor interpolation effects"
     },
     {

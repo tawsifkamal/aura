@@ -6,6 +6,7 @@
 - Quality checks: `turbo run build`, `turbo run lint`, `turbo run check-types`
 - New Node.js packages: extend `@repo/typescript-config/base.json`, add `eslint.config.js` with `@repo/eslint-config/base`, set `type: "module"`
 - Core utilities live in `packages/core/src/` — import with `@repo/core` or `@repo/core/<module>`
+- ESLint `--max-warnings 0` means NO unused vars allowed (even with `_` prefix) — remove unused params entirely
 
 ---
 
@@ -89,4 +90,24 @@
   - Event handler detection (onClick etc.) serves as a fallback when no HTML element is directly visible in the diff
   - Diff hunks keyed by file path allow mapping elements back to their source route
   - Wait times vary by action: 500ms for clicks, 2000ms for form submissions
+---
+
+## 2026-02-28 - US-006
+- Created `video-processor.ts` in `packages/core/src/` for Screen Studio-style post-processing
+- `interpolateCursorPath()`: cubic bezier interpolation between cursor keyframes, deterministic output
+- `generateZoomKeyframes()`: creates zoom-in effects on click/type actions
+- `getZoomAtTime()`: frame-level zoom with asymmetric easing (30% zoom-in, 70% zoom-out)
+- Three style presets: default (balanced), minimal (subtle), dramatic (deep zoom + dark bg)
+- `buildFFmpegCompositeCommand()`: generates FFmpeg command for H.264 MP4 with cursor overlay + zoom
+- `prepareVideoProcessing()`: full pipeline — builds cursor path, zoom keyframes, manifest, FFmpeg command
+- `writeRenderManifest()`: writes render-manifest.json with all processing metadata
+- Updated skill prompt Step 5 with detailed post-processing instructions
+- Files changed: `packages/core/src/video-processor.ts` (new), `packages/core/src/index.ts` (updated), `.claude/commands/record-demo.md` (updated)
+- **Learnings for future iterations:**
+  - ESLint in this project treats `_` prefixed unused params as warnings too — remove unused params entirely instead
+  - Cubic bezier with control points along x-axis only produces natural horizontal cursor arcs
+  - Asymmetric zoom (fast in, slow out) feels more natural than symmetric — use 30/70 split
+  - FFmpeg `-movflags +faststart` is essential for web playback (moves moov atom to start)
+  - `zoompan` filter in FFmpeg can do per-frame zoom but syntax is complex for dynamic keyframes
+  - Render manifest JSON captures all processing metadata for debugging and reproducibility
 ---
