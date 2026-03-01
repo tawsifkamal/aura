@@ -216,7 +216,7 @@
         "Backend editing API supports crop, trim, split, zoom, cursor emphasis, and style preset operations"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Editor should be powerful and production-grade, not a minimal crop-only tool. The backend API is the single source of truth for edits — the dashboard GUI and Composio conversational edits (US-019) both call it"
     },
     {
@@ -232,7 +232,7 @@
         "Export metadata and files are persisted in Convex-linked run records"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Use sane defaults but expose advanced controls for power users"
     },
     {
