@@ -141,7 +141,7 @@ interface RecordingResult {
 
 async function createSandbox(apiKey: string): Promise<{ daytona: Daytona; sandbox: Sandbox }> {
   const daytona = new Daytona({ apiKey });
-  const sandbox = await daytona.create({ snapshot: "glimpse-v2" });
+  const sandbox = await daytona.create({ snapshot: "glimpse" });
   return { daytona, sandbox };
 }
 
@@ -164,7 +164,7 @@ async function analyzeChanges(sandbox: Sandbox, groqApiKey: string): Promise<Ana
     "setup: shell commands to install deps and start the dev server. Look at package.json scripts to determine the right commands. " +
     "base_url: the URL where the app is served locally after running the setup commands (e.g. http://localhost:3000). Check package.json, framework config, or dev server settings to determine the correct port. " +
     "tasks: browser testing steps (empty array if has_ui_changes is false). " +
-    "Task rules: Start with Navigate to /path. Use element IDs like id=search-input. End with a verification. Be specific. Each step tests ONE change. Between each action (navigation, click, type, etc.) include a 'Wait 1 second.' instruction so the UI has time to update. " +
+    "Task rules: Start with Navigate to /path. Use element IDs like id=search-input. End with a verification. Be specific. Each step tests ONE change. " +
     "Write the file now.";
 
   await sandbox.process.executeCommand(
@@ -211,7 +211,7 @@ async function runSetupAndWait(sandbox: Sandbox, commands: string[], baseUrl: st
 
 async function recordVideo(
   sandbox: Sandbox, tasks: Array<{ id: string; description: string }>,
-  baseUrl: string, anthropicApiKey: string,
+  baseUrl: string, browserUseApiKey: string,
 ): Promise<RecordingResult> {
   const tasksJson = JSON.stringify(tasks);
   const escapedTasksJson = tasksJson.replace(/'/g, "'\\''");
@@ -219,10 +219,10 @@ async function recordVideo(
   const cmd =
     `cd /home/daytona/repo && python -m demo_recorder.cli ` +
     `--tasks '${escapedTasksJson}' --base-url ${baseUrl} --headless --max-steps 20 ` +
-    `--model claude-opus-4-6`;
+    `--model browser-use`;
 
   const result = await sandbox.process.executeCommand(
-    cmd, undefined, { ANTHROPIC_API_KEY: anthropicApiKey }, 300,
+    cmd, undefined, { BROWSER_USE_API_KEY: browserUseApiKey }, 300,
   );
 
   const output = result.result;
@@ -350,7 +350,7 @@ async function runPipeline(msg: PrPipelineMessage, env: Env): Promise<void> {
         // Step 10: Record video
         log("step 10", "starting browser recording");
         await updateComment("🎥 Recording demo video...");
-        const recording = await recordVideo(sandbox, analysis.tasks, analysis.base_url, env.ANTHROPIC_API_KEY);
+        const recording = await recordVideo(sandbox, analysis.tasks, analysis.base_url, env.BROWSER_USE_API_KEY);
         log("step 10", `recording done: verdict=${recording.verdict}, video=${recording.videoPath}`);
 
         const verdictIcon = recording.verdict === "pass" ? "✅" : "❌";
