@@ -13,6 +13,7 @@
 - Dashboard UI at `apps/web/` — strict B&W theme, sharp edges, CSS Modules, responsive grid
 - Upload utility in `packages/core/src/convex-uploader.ts` — uses Convex HTTP API for uploads from CLI/pipeline
 - PR bot in `packages/core/src/pr-bot.ts` — single persistent comment with `<!-- aura-bot -->` marker, status lifecycle
+- Daytona sandbox orchestration in `packages/core/src/sandbox.ts` — create/exec/export/destroy lifecycle
 
 ---
 
@@ -165,4 +166,22 @@
   - Hidden HTML comments (`<!-- marker -->`) are the standard pattern for bot comment identification
   - Always use `per_page=100` when searching for existing comments to avoid pagination issues on busy PRs
   - The `X-GitHub-Api-Version` header is recommended for API stability
+---
+
+## 2026-02-28 - US-010
+- Created `sandbox.ts` in `packages/core/src/` for Daytona sandbox orchestration
+- `createSandbox()`: spawns Daytona workspace with repo, branch, image, and env vars
+- `runInSandbox()`: executes commands inside sandbox with output capture and artifact parsing
+- `exportArtifact()`: copies files from sandbox to local path via `daytona cp`
+- `destroySandbox()`: best-effort cleanup via `daytona delete --force`
+- `runPipeline()`: sequential multi-step execution with early exit on failure
+- `buildRecordingPipelineSteps()`: standard recording pipeline (install, browsers, build, record)
+- Pipeline is resumable — run state metadata lives in Convex, sandbox is stateless
+- Falls back gracefully when `daytona` CLI is not available (sandbox status = "failed")
+- Files changed: `packages/core/src/sandbox.ts` (new), `packages/core/src/index.ts` (updated)
+- **Learnings for future iterations:**
+  - Daytona CLI uses `daytona create/exec/cp/delete` subcommands
+  - Use `maxBuffer: 50MB` for exec to handle large build outputs
+  - Parse artifact paths from stdout using regex pattern matching on "artifact:", "output:", etc.
+  - Best-effort cleanup pattern: wrap destroy in try/catch, never throw on cleanup failure
 ---

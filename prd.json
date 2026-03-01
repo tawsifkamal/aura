@@ -155,7 +155,7 @@
         "Pipeline can be resumed or retried without losing run state metadata"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Daytona is the default execution runtime for untrusted or variable project code"
     },
     {
