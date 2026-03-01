@@ -105,18 +105,68 @@ Dev server ready at http://localhost:<port>
 
 **Cleanup**: Remember to kill the server process when done recording (Step 5). Use `process.kill(-pid, 'SIGTERM')` to kill the process group.
 
-## Step 4: Navigate and Record with browser-use
+## Step 3: Navigate and Record with browser-use
 
-Use the browser-use TypeScript library to:
-1. Open the app at the detected localhost URL
-2. Navigate to routes affected by the code changes
-3. Interact with changed UI elements (click buttons, fill forms, toggle states)
-4. Capture screenshots at each interaction step
-5. Record the full session as video
+Use the `browser-use` TypeScript library (npm package) with Playwright for browser automation.
+The session orchestration lives in `packages/core/src/browser-recorder.ts`.
 
-Integration points (wire up when available):
-- **Laminar**: Trace each browser-use run for observability
-- **Supermemory**: Recall prior run context for smarter navigation planning
+### 3a. Initialize recording session
+
+Use `createSession()` from `@repo/core/browser-recorder`:
+- Pass `baseUrl` (from Step 2), `routes` (from Step 1), and optional tracing/memory config
+- Call `createOutputDir()` to create `demos/[timestamp]/` and `demos/[timestamp]/screenshots/`
+
+### 3b. Set up browser-use Agent
+
+```typescript
+import { Agent } from "browser-use";
+```
+
+Configure the browser-use Agent with:
+- The detected localhost URL as the starting point
+- Routes from Step 1 as navigation targets
+- Headless mode (or headed for debugging)
+- Viewport: 1280x720 for consistent recording
+
+### 3c. Navigate affected routes
+
+For each inferred route (sorted by confidence: high first):
+1. Navigate to the URL using browser-use Agent
+2. Wait for the page to be fully loaded (networkidle)
+3. Take a screenshot using Playwright's `page.screenshot()` — save to `screenshots/step-N.png`
+4. Log the step with `addStep(session, { action: "navigate", url })`
+
+### 3d. Record interactions
+
+Use Playwright's built-in video recording:
+- Configure `browser.newContext({ recordVideo: { dir: outputDir, size: { width: 1280, height: 720 } } })`
+- The video is saved automatically when the context is closed
+
+For each page, use browser-use to:
+- Identify interactive elements on the page
+- Click buttons, fill forms, toggle states as the diff suggests
+- Take screenshots after each interaction
+
+### 3e. Laminar tracing integration
+
+If Laminar is configured (`LAMINAR_ENDPOINT` env var):
+- Use `buildLaminarMetadata()` to generate trace metadata
+- Attach trace ID to the recording session
+- Each browser-use step emits trace data for observability
+
+### 3f. Supermemory context integration
+
+If Supermemory is configured (`SUPERMEMORY_ENDPOINT` env var):
+- Use `buildSupermemoryQuery()` to retrieve prior run context
+- Use retrieved context to refine which routes to visit and what to interact with
+- After recording, store this session's context for future runs
+
+### 3g. Save outputs
+
+- Close the browser context to finalize the video file
+- Move the video to `demos/[timestamp]/recording.mp4`
+- Call `writeSummary()` to generate `demos/[timestamp]/summary.md`
+- Call `completeSession()` to mark the session as done
 
 ## Step 5: Generate Demo Output
 

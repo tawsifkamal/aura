@@ -20,3 +20,21 @@ export {
   findActivePort,
 } from "./dev-server.js";
 export type { DevServerOptions, DevServerHandle } from "./dev-server.js";
+
+export {
+  createSession,
+  createOutputDir,
+  addStep,
+  buildNavigationScript,
+  writeSummary,
+  completeSession,
+  buildLaminarMetadata,
+  buildSupermemoryQuery,
+} from "./browser-recorder.js";
+export type {
+  RecordingStep,
+  RecordingSession,
+  BrowserRecorderOptions,
+  LaminarTraceConfig,
+  SupermemoryConfig,
+} from "./browser-recorder.js";
