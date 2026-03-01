@@ -13,12 +13,13 @@ Input shape (from upstream agent like Claude Code):
     ]
 """
 
+import json
 import os
 import re
 import signal
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime
 
@@ -94,6 +95,91 @@ def stop_xvfb(proc: subprocess.Popen | None) -> None:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
+
+
+# ── Interaction event extraction from browser-use history ─────────────
+
+def extract_interaction_events(history, recording_start_time: float) -> list[dict]:
+    """
+    Walk the browser-use AgentHistoryList and pull out interaction events
+    with coordinates and timestamps relative to the recording start.
+
+    Returns a list of dicts like:
+        {"type": "click", "atMs": 4500, "x": 320, "y": 180, "note": "clicked button"}
+    """
+    events: list[dict] = []
+
+    for step in history.history:
+        # Get the step's timestamp relative to recording start
+        step_time_ms = 0
+        if step.metadata and hasattr(step.metadata, 'step_start_time'):
+            step_time_ms = int((step.metadata.step_start_time - recording_start_time) * 1000)
+            step_time_ms = max(0, step_time_ms)
+
+        # Extract action types and coordinates from model_output + results
+        if not step.model_output:
+            continue
+
+        actions = step.model_output.action or []
+        results = step.result or []
+
+        for action_idx, action in enumerate(actions):
+            action_dict = action.model_dump(exclude_none=True, mode='json')
+            # action_dict has one key like "click_element", "input_text", etc.
+            action_type = list(action_dict.keys())[0] if action_dict else None
+            if not action_type:
+                continue
+
+            action_params = action_dict[action_type]
+
+            # Try to get click coordinates from the action result metadata
+            click_x = None
+            click_y = None
+            if action_idx < len(results) and results[action_idx].metadata:
+                meta = results[action_idx].metadata
+                click_x = meta.get('click_x')
+                click_y = meta.get('click_y')
+
+            # Also check action params for explicit coordinates
+            if click_x is None and isinstance(action_params, dict):
+                click_x = action_params.get('coordinate_x')
+                click_y = action_params.get('coordinate_y')
+
+            # Build the note from action context
+            note = ""
+            if isinstance(action_params, dict):
+                note = action_params.get('text', '') or action_params.get('url', '') or ''
+
+            if action_type in ('click_element', 'click'):
+                if click_x is not None and click_y is not None:
+                    events.append({
+                        "type": "click",
+                        "atMs": step_time_ms,
+                        "x": int(click_x),
+                        "y": int(click_y),
+                        "note": note or "click",
+                    })
+            elif action_type in ('input_text', 'type'):
+                if click_x is not None and click_y is not None:
+                    events.append({
+                        "type": "click",
+                        "atMs": step_time_ms,
+                        "x": int(click_x),
+                        "y": int(click_y),
+                        "note": f"type: {note[:50]}",
+                    })
+            elif action_type in ('scroll_down', 'scroll_up', 'scroll'):
+                # No coordinates needed for scroll, but record it
+                events.append({
+                    "type": "scroll",
+                    "atMs": step_time_ms,
+                    "x": 960,
+                    "y": 540,
+                    "note": action_type,
+                })
+
+    events.sort(key=lambda e: e["atMs"])
+    return events
 
 
 # ── Convex upload ──────────────────────────────────────────────────────
@@ -174,6 +260,7 @@ class TasksResult:
     verdict_reasoning: str | None = None
     error: str | None = None
     video_url: str | None = None     # Convex signed URL if uploaded
+    interaction_events: list[dict] = field(default_factory=list)
 
 
 # ── Prompt builder ─────────────────────────────────────────────────────
@@ -307,7 +394,12 @@ async def run_tasks(
             time.sleep(0.5)  # let ffmpeg initialize
 
         # ── Run the agent ──
+        recording_start_time = time.time()
         history = await agent.run(max_steps=max_steps)
+
+        # ── Extract interaction events from history ──
+        interaction_events = extract_interaction_events(history, recording_start_time)
+        print(f"  Extracted {len(interaction_events)} interaction events")
 
         # ── Small delay so the final frame is captured ──
         import asyncio
@@ -380,6 +472,11 @@ async def run_tasks(
             f"---\n*Recorded with demo-recorder task_runner*\n"
         )
 
+        # ── Write events JSON ──
+        events_path = output_dir / "events.json"
+        events_path.write_text(json.dumps(interaction_events, indent=2))
+        print(f"EVENTS_JSON: {json.dumps(interaction_events)}")
+
         print(f"✓ Recording complete → {output_dir}")
         if video_url:
             print(f"VIDEO_URL: {video_url}")
@@ -391,6 +488,7 @@ async def run_tasks(
             verdict=verdict,
             verdict_reasoning=verdict_reasoning,
             video_url=video_url,
+            interaction_events=interaction_events,
         )
 
     except Exception as exc:  # noqa: BLE001
