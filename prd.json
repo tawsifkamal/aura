@@ -124,7 +124,7 @@
         "Link points to the specific uploaded run, not only the dashboard root"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Optimizes handoff from local skill execution to shareable artifact"
     },
     {

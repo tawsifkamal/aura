@@ -138,3 +138,14 @@
   - Convex local dev runs on port 3210 (HTTP API) and 3211 (site URL)
   - Root `convex/` directory is created by `npx convex dev` when run from monorepo root — don't commit it
 ---
+
+## 2026-02-28 - US-008
+- Updated skill prompt Step 5g to explicitly require dashboard link in Claude's response
+- Response format now mandates: dashboard URL (specific run, not root), short summary, routes tested, local file paths
+- `createRun()` from `@repo/core/convex-uploader` already returns `{ runId, dashboardUrl }` with `/runs/<runId>` path
+- Added graceful fallback: if upload fails, still report local files with error note
+- Files changed: `.claude/commands/record-demo.md`
+- **Learnings for future iterations:**
+  - The skill prompt is the single source of truth for Claude's response format — be explicit about what must appear
+  - `dashboardUrl` from `createRun()` already contains the full specific-run URL — no need to construct it separately
+---
