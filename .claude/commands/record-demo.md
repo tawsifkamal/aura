@@ -224,36 +224,80 @@ Interaction Plan: [N] actions across [M] routes
   3. [toggle] [role="switch"] on /settings (medium confidence)
 ```
 
-## Step 5: Generate Demo Output
+## Step 5: Generate Screen Studio-Style Video and Summary
 
-Create a `demos/[timestamp]/` folder containing:
-- `recording.mp4` - Screen Studio-style video with smooth cursor animation and zoom emphasis
-- `screenshots/` - Individual screenshots of each interaction step
-- `summary.md` - Markdown summary of what was tested and demonstrated
+Use `prepareVideoProcessing()` from `@repo/core/video-processor` to apply post-processing effects.
+The implementation lives in `packages/core/src/video-processor.ts`.
 
-Apply post-processing effects:
-- Smooth synthetic cursor animation between interaction targets
-- Zoom-in emphasis on click/type actions
-- Clean, deterministic motion paths
+### 5a. Choose a style preset
 
-## Step 6: Report Results
+Available presets (`PRESETS` from `@repo/core`):
+- **default**: Balanced zoom (1.5x), cursor trail, 12px rounded corners, shadow
+- **minimal**: Subtle zoom (1.3x), no trail, sharp corners, clean
+- **dramatic**: Deep zoom (2.0x), cursor trail, 16px rounded, dark background
 
-Print the output path and summary to the user:
+### 5b. Generate smooth cursor animation
+
+`interpolateCursorPath()` creates a frame-by-frame cursor position array:
+- Uses cubic bezier interpolation between interaction keyframes
+- Easing function (ease-in-out) ensures natural acceleration/deceleration
+- `motionSmoothing` (0-1) controls curve intensity — higher = smoother arcs
+- Output: one `{x, y}` point per video frame at the target FPS
+
+The cursor path is **deterministic** — same inputs always produce the same animation.
+
+### 5c. Generate zoom keyframes
+
+`generateZoomKeyframes()` creates zoom-in effects on click/type actions:
+- Each click/type step triggers a zoom toward the cursor position
+- Zoom-in takes 30% of duration, zoom-out takes 70% (asymmetric for emphasis)
+- Zoom scale and duration are configurable via the style preset
+
+### 5d. Build FFmpeg render command
+
+`prepareVideoProcessing()` returns an FFmpeg command that:
+1. Takes the raw Playwright recording (`.webm`) as input
+2. Applies cursor overlay filter (drawbox at animated positions)
+3. Applies zoom/pan filter for smooth zoom effects
+4. Encodes to H.264 MP4 with `yuv420p` pixel format
+5. Uses `-movflags +faststart` for web-optimized playback
+6. Writes `render-manifest.json` with all processing metadata
+
+Run the FFmpeg command:
+```bash
+ffmpeg -i input.webm -vf "drawbox=...,zoompan=..." -r 30 -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -movflags +faststart -y recording.mp4
+```
+
+### 5e. Generate summary
+
+Call `writeSummary()` from `@repo/core/browser-recorder` to create `summary.md` with:
+- Session metadata (ID, timestamp, duration)
+- Routes visited with confidence levels
+- Step-by-step action log with timestamps
+- Description of changes tested
+
+### 5f. Report results
+
+Print the final output to the user:
 ```
 Demo recorded successfully!
-Output: demos/YYYY-MM-DD-HHMMSS/
-  - recording.mp4
-  - screenshots/ (N screenshots)
+Output: demos/YYYYMMDD-HHMMSS/
+  - recording.mp4 (Screen Studio-style, [preset] preset)
+  - screenshots/ ([N] screenshots)
   - summary.md
+  - render-manifest.json
 
 Summary: [brief description of what was recorded]
+Duration: [X]s | Resolution: 1280x720 | FPS: 30
 ```
 
 ## Implementation Notes
 
-- This skill uses TypeScript/Node.js only - no Python runtime dependency
+- This skill uses TypeScript/Node.js only — no Python runtime dependency
 - browser-use TypeScript library handles browser automation
-- Video post-processing uses Node.js-based rendering pipeline
+- Video post-processing uses FFmpeg via Node.js child_process
+- Cursor animation uses cubic bezier interpolation for smooth, deterministic paths
+- Zoom effects use asymmetric easing (fast zoom-in, slow zoom-out)
 - All orchestration is TypeScript-first
 
 ## Arguments

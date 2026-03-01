@@ -49,3 +49,28 @@ export type {
   LaminarTraceConfig,
   SupermemoryConfig,
 } from "./browser-recorder.js";
+
+export {
+  interpolateCursorPath,
+  generateZoomKeyframes,
+  getZoomAtTime,
+  getEasing,
+  prepareVideoProcessing,
+  writeRenderManifest,
+  buildRenderManifest,
+  buildFFmpegCompositeCommand,
+  buildCursorOverlayFilter,
+  buildZoomPanFilter,
+  PRESETS,
+} from "./video-processor.js";
+export type {
+  Point,
+  CursorKeyframe,
+  ZoomKeyframe,
+  StylePreset,
+  EasingFunction,
+  VideoProcessorOptions,
+  ProcessedVideo,
+  FFmpegCommand,
+  RenderManifest,
+} from "./video-processor.js";
