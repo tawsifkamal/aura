@@ -174,6 +174,7 @@ def build_prompt(tasks: list[dict], base_url: str) -> str:
         f"- Wait 1-2 seconds between each action so interactions are clearly visible.\n"
         f"- After filling a field, pause briefly before clicking submit.\n"
         f"- After each step completes, pause 2 seconds before starting the next step.\n"
+        f"- If a step cannot be completed (element not found, page error, etc.), stop immediately and report failure. Do not retry endlessly.\n"
         f"- Do not close the browser when done."
     )
 

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { ConvexClient } from "../convex";
 import { createPrComment, updatePrComment, getPrDiff } from "../github";
-import { createSandbox, cloneRepo, writeDiffFile, analyzeChanges, destroySandbox } from "../daytona";
+import { createSandbox, cloneRepo, writeDiffFile, analyzeChanges, runSetup, waitForServer, recordVideo, uploadVideoFromSandbox, destroySandbox } from "../daytona";
 
 export const webhooks = new Hono<{
   Bindings: Env;
@@ -86,6 +86,7 @@ webhooks.post("/pr", async (c) => {
     const isPrivate = repo.isPrivate;
     const daytonaApiKey = c.env.DAYTONA_API_KEY;
     const groqApiKey = c.env.GROQ_API_KEY;
+    const browserUseApiKey = c.env.BROWSER_USE_API_KEY;
 
     const pipeline = async () => {
       let commentId: number | undefined;
@@ -146,11 +147,58 @@ webhooks.post("/pr", async (c) => {
               `**Setup:**\n\`\`\`bash\n${analysis.setup.join("\n")}\n\`\`\`\n\n` +
               `**Testing steps:**\n${taskList}`
             );
+
+            // Step 8: Run setup commands (last one starts dev server in background)
+            await updateComment("⏳ Setting up project...");
+            await runSetup(sandbox, analysis.setup);
+
+            // Step 9: Wait for dev server to be reachable
+            await waitForServer(sandbox, analysis.base_url, 60);
+            await updateComment("✅ Dev server is running.");
+
+            // Step 10: Record browser demo video
+            await updateComment("🎥 Recording demo video...");
+            const recording = await recordVideo(
+              sandbox,
+              analysis.tasks,
+              analysis.base_url,
+              browserUseApiKey,
+            );
+
+            const verdictIcon = recording.verdict === "pass" ? "✅" : "❌";
+            await updateComment(
+              `${verdictIcon} Recording complete — verdict: **${recording.verdict}**` +
+              (recording.reasoning ? `\n> ${recording.reasoning}` : ""),
+            );
+
+            // Step 11: Upload video to Convex storage
+            await updateComment("⬆️ Uploading video...");
+            const uploadUrl = await convex.mutation<string>("runs:generateUploadUrl");
+            const storageId = await uploadVideoFromSandbox(
+              sandbox,
+              recording.videoPath,
+              uploadUrl,
+            );
+
+            // Step 12: Get signed download URL
+            const videoUrl = await convex.query<string | null>(
+              "runs:getStorageUrl",
+              { storageId },
+            );
+
+            if (videoUrl) {
+              await updateComment(
+                `\n### 🎬 Demo Video\n\n` +
+                `<video src="${videoUrl}" controls muted autoplay loop width="640"></video>\n\n` +
+                `[Download video](${videoUrl})`,
+              );
+            }
+
+            await destroySandbox(daytona, sandbox);
           } else {
             await updateComment("✅ Analysis complete. No UI changes detected — skipping video recording.");
+            await destroySandbox(daytona, sandbox);
           }
-
-          // Don't destroy sandbox on success — more steps coming later
         } catch (innerErr) {
           // Cleanup sandbox on error during clone/update
           await destroySandbox(daytona, sandbox).catch(() => {});

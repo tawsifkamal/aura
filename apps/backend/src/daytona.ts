@@ -72,6 +72,149 @@ export async function analyzeChanges(
   return JSON.parse(cat.result) as AnalysisResult;
 }
 
+export async function runSetup(
+  sandbox: Sandbox,
+  commands: string[],
+): Promise<void> {
+  if (commands.length === 0) return;
+
+  const cwd = "/home/daytona/repo";
+
+  // Run all commands except the last one synchronously
+  for (let i = 0; i < commands.length - 1; i++) {
+    const result = await sandbox.process.executeCommand(commands[i], cwd, undefined, 300);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Setup command failed (exit ${result.exitCode}): ${commands[i]}\n${result.result}`,
+      );
+    }
+  }
+
+  // Run last command (dev server) in background
+  const lastCmd = commands[commands.length - 1];
+  await sandbox.process.executeCommand(
+    `nohup ${lastCmd} > /tmp/dev-server.log 2>&1 &`,
+    cwd,
+    undefined,
+    10,
+  );
+}
+
+export async function waitForServer(
+  sandbox: Sandbox,
+  baseUrl: string,
+  timeoutSecs: number = 60,
+): Promise<void> {
+  const pollIntervalMs = 2000;
+  const maxAttempts = Math.ceil((timeoutSecs * 1000) / pollIntervalMs);
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const result = await sandbox.process.executeCommand(
+      `curl -s -o /dev/null -w '%{http_code}' ${baseUrl}`,
+      undefined,
+      undefined,
+      10,
+    );
+
+    const statusCode = parseInt(result.result.trim(), 10);
+    if (statusCode >= 200 && statusCode < 400) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  const logs = await sandbox.process.executeCommand(
+    `tail -30 /tmp/dev-server.log 2>/dev/null || echo "No server logs found"`,
+  );
+  throw new Error(
+    `Server at ${baseUrl} did not become ready within ${timeoutSecs}s.\nServer logs:\n${logs.result}`,
+  );
+}
+
+export interface RecordingResult {
+  verdict: string;
+  reasoning: string;
+  videoPath: string;
+  outputDir: string;
+}
+
+export async function recordVideo(
+  sandbox: Sandbox,
+  tasks: Array<{ id: string; description: string }>,
+  baseUrl: string,
+  browserUseApiKey: string,
+): Promise<RecordingResult> {
+  const tasksJson = JSON.stringify(tasks);
+  const escapedTasksJson = tasksJson.replace(/'/g, "'\\''");
+
+  const cmd =
+    `cd /home/daytona/repo && ` +
+    `python -m demo_recorder.cli ` +
+    `--tasks '${escapedTasksJson}' ` +
+    `--base-url ${baseUrl} ` +
+    `--headless ` +
+    `--max-steps 20`;
+
+  const result = await sandbox.process.executeCommand(
+    cmd,
+    undefined,
+    { BROWSER_USE_API_KEY: browserUseApiKey },
+    300,
+  );
+
+  const output = result.result;
+  const getLine = (prefix: string): string => {
+    const match = output.match(new RegExp(`^${prefix}:\\s*(.+)$`, "m"));
+    return match?.[1]?.trim() ?? "";
+  };
+
+  const verdict = getLine("VERDICT") || "unknown";
+  const reasoning = getLine("REASONING");
+  const videoPath = getLine("VIDEO");
+  const outputDir = getLine("OUTPUT_DIR");
+
+  if (!videoPath || videoPath === "not found") {
+    throw new Error(`Demo recorder did not produce a video.\nOutput:\n${output}`);
+  }
+
+  return { verdict, reasoning, videoPath, outputDir };
+}
+
+export async function uploadVideoFromSandbox(
+  sandbox: Sandbox,
+  videoPath: string,
+  uploadUrl: string,
+): Promise<string> {
+  const contentType = videoPath.endsWith(".webm") ? "video/webm" : "video/mp4";
+
+  const result = await sandbox.process.executeCommand(
+    `curl -s -X POST "${uploadUrl}" ` +
+    `-H "Content-Type: ${contentType}" ` +
+    `--data-binary @${videoPath}`,
+    undefined,
+    undefined,
+    120,
+  );
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Video upload failed (exit ${result.exitCode}): ${result.result}`);
+  }
+
+  let parsed: { storageId?: string };
+  try {
+    parsed = JSON.parse(result.result);
+  } catch {
+    throw new Error(`Upload response is not valid JSON: ${result.result}`);
+  }
+
+  if (!parsed.storageId) {
+    throw new Error(`Upload response missing storageId: ${result.result}`);
+  }
+
+  return parsed.storageId;
+}
+
 export async function destroySandbox(
   daytona: Daytona,
   sandbox: Sandbox,
