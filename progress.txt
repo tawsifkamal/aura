@@ -37,3 +37,21 @@
   - The `parseDiffNameStatus` function is exported separately so it can be unit-tested without git
   - Route inference confidence levels help the browser agent prioritize which routes to visit
 ---
+
+## 2026-02-28 - US-003
+- Created `dev-server.ts` in `packages/core/src/` with dev server lifecycle management
+- `startDevServer()`: spawns dev process in background, polls for HTTP readiness, returns handle with kill()
+- `httpCheck()`: single HTTP GET probe to localhost port
+- `waitForPort()`: polls with configurable timeout (default 60s) and interval (default 500ms)
+- `findActivePort()`: scans common ports (3000, 5173, 8080, 4200, 4321, 8000) as fallback
+- `resolveDevCommand()`: derives `npm run <script>` from WebAppInfo
+- Handles already-running servers (returns no-op handle)
+- Uses `detached: true` + process group kill for clean cleanup
+- Updated skill prompt Step 2 with detailed server startup instructions
+- Files changed: `packages/core/src/dev-server.ts` (new), `packages/core/src/index.ts` (updated), `.claude/commands/record-demo.md` (updated)
+- **Learnings for future iterations:**
+  - Use `process.kill(-pid, 'SIGTERM')` for process group cleanup (negative PID kills the group)
+  - Set `FORCE_COLOR=0` env var to avoid ANSI escapes in captured output
+  - Always check if port is already in use before spawning — avoids double-server issues
+  - `detached: true` with `stdio: ["ignore", "pipe", "pipe"]` prevents zombie processes
+---

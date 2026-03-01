@@ -43,7 +43,7 @@
         "Handle common ports (3000, 5173, 8080)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Use Bash tool for server, need to handle cleanup"
     },
     {
