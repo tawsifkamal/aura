@@ -401,25 +401,7 @@ async def run_tasks(
         recording_start_time = time.time()
         history = await agent.run(max_steps=max_steps)
 
-        # ── Compute trim offset: find when browser first navigates to localhost ──
-        trim_offset_sec = 0.0
-        if use_xvfb and history.history:
-            try:
-                for step in history.history:
-                    # Check if this step's URL points to the app (localhost)
-                    step_url = getattr(step.state, 'url', '') or ''
-                    if 'localhost' in step_url or '127.0.0.1' in step_url:
-                        if step.metadata and hasattr(step.metadata, 'step_start_time'):
-                            first_nav_time = step.metadata.step_start_time
-                            trim_offset_sec = first_nav_time - recording_start_time
-                            trim_offset_sec = max(0.0, trim_offset_sec - 0.5)
-                            print(f"  First localhost URL at step: {step_url}")
-                        break
-            except (AttributeError, IndexError):
-                trim_offset_sec = 0.0
-        print(f"  Trim offset: {trim_offset_sec:.2f}s")
-
-        # ── Extract interaction events from history ──
+        # ── Extract interaction events from history (before trim adjustment) ──
         interaction_events = extract_interaction_events(history, recording_start_time)
         print(f"  Extracted {len(interaction_events)} interaction events")
 
@@ -432,7 +414,30 @@ async def run_tasks(
             stop_screen_recording(ffmpeg_proc)
             ffmpeg_proc = None
 
-        # ── Trim dead time from start of video ──
+        # ── Trim dark loading screen from start of video ──
+        # Use FFmpeg blackdetect to find when the dark browser-use splash ends
+        # and the bright page appears (dark→light transition).
+        trim_offset_sec = 0.0
+        if use_xvfb:
+            try:
+                detect_result = subprocess.run(
+                    [
+                        "ffmpeg", "-i", str(video_path),
+                        "-vf", "blackdetect=d=0.5:pix_th=0.10:pic_th=0.85",
+                        "-an", "-f", "null", "-",
+                    ],
+                    capture_output=True, text=True, timeout=30,
+                )
+                # Parse black_end from stderr — last black period ending is our trim point
+                for line in detect_result.stderr.split("\n"):
+                    m = re.search(r"black_end:\s*([\d.]+)", line)
+                    if m:
+                        trim_offset_sec = float(m.group(1))
+                print(f"  blackdetect trim offset: {trim_offset_sec:.2f}s")
+            except (subprocess.TimeoutExpired, Exception) as e:
+                print(f"  blackdetect failed ({e}), no trim")
+                trim_offset_sec = 0.0
+
         if use_xvfb and trim_offset_sec > 1.0:
             trimmed_path = output_dir / "trimmed.mp4"
             trim_result = subprocess.run(
@@ -443,9 +448,7 @@ async def run_tasks(
                     "-c", "copy",
                     str(trimmed_path),
                 ],
-                capture_output=True,
-                text=True,
-                timeout=30,
+                capture_output=True, text=True, timeout=30,
             )
             if trim_result.returncode == 0 and trimmed_path.exists() and trimmed_path.stat().st_size > 0:
                 trimmed_path.rename(video_path)
