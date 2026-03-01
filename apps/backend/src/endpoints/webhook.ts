@@ -88,6 +88,10 @@ webhooks.post("/pr", async (c) => {
     const groqApiKey = c.env.GROQ_API_KEY;
     const browserUseApiKey = c.env.BROWSER_USE_API_KEY;
 
+    const log = (step: string, detail?: string) => {
+      console.log(`[webhook/pr] [${owner}/${repoName}#${prNumber}] ${step}${detail ? `: ${detail}` : ""}`);
+    };
+
     const pipeline = async () => {
       let commentId: number | undefined;
       let commentBody = "";
@@ -101,6 +105,7 @@ webhooks.post("/pr", async (c) => {
 
       try {
         // Step 1: Post initial PR comment
+        log("step 1", "posting initial comment");
         commentBody = "🔄 **Aura** is analyzing this pull request...";
         const comment = await createPrComment(
           accessToken,
@@ -112,11 +117,15 @@ webhooks.post("/pr", async (c) => {
         commentId = comment.id;
 
         // Step 2: Fetch PR diff via GitHub API (fast, no clone needed)
+        log("step 2", "fetching PR diff");
         const diff = await getPrDiff(accessToken, owner, repoName, prNumber);
+        log("step 2", `diff fetched (${diff.length} chars)`);
         await updateComment("📋 Fetched PR diff.");
 
         // Step 3: Create Daytona sandbox (no env vars — secrets passed per-command)
+        log("step 3", "creating sandbox");
         const { daytona, sandbox } = await createSandbox(daytonaApiKey);
+        log("step 3", `sandbox created: ${sandbox.id}`);
 
         try {
           // Step 4: Sandbox ready, cloning
@@ -127,14 +136,18 @@ webhooks.post("/pr", async (c) => {
             ? `https://x-access-token:${accessToken}@github.com/${owner}/${repoName}.git`
             : `https://github.com/${owner}/${repoName}.git`;
 
+          log("step 4", `cloning ${owner}/${repoName} branch=${branch}`);
           await cloneRepo(sandbox, cloneUrl, branch);
+          log("step 4", "clone done");
 
           // Step 5: Write pre-fetched diff into the repo
           await writeDiffFile(sandbox, diff);
           await updateComment("🔍 Repository cloned. Analyzing PR changes...");
 
           // Step 6: Run OpenCode to analyze the diff and generate testing steps
+          log("step 6", "running OpenCode analysis");
           const analysis = await analyzeChanges(sandbox, groqApiKey);
+          log("step 6", `analysis done: has_ui_changes=${analysis.has_ui_changes}, tasks=${analysis.tasks.length}`);
 
           // Step 7: Analysis complete
           if (analysis.has_ui_changes) {
@@ -149,14 +162,19 @@ webhooks.post("/pr", async (c) => {
             );
 
             // Step 8: Run setup commands (last one starts dev server in background)
+            log("step 8", `running setup: ${analysis.setup.join(" && ")}`);
             await updateComment("⏳ Setting up project...");
             await runSetup(sandbox, analysis.setup);
+            log("step 8", "setup done, dev server backgrounded");
 
             // Step 9: Wait for dev server to be reachable
+            log("step 9", `waiting for server at ${analysis.base_url}`);
             await waitForServer(sandbox, analysis.base_url, 60);
+            log("step 9", "server is up");
             await updateComment("✅ Dev server is running.");
 
             // Step 10: Record browser demo video
+            log("step 10", "starting browser recording");
             await updateComment("🎥 Recording demo video...");
             const recording = await recordVideo(
               sandbox,
@@ -164,6 +182,7 @@ webhooks.post("/pr", async (c) => {
               analysis.base_url,
               browserUseApiKey,
             );
+            log("step 10", `recording done: verdict=${recording.verdict}, video=${recording.videoPath}`);
 
             const verdictIcon = recording.verdict === "pass" ? "✅" : "❌";
             await updateComment(
@@ -172,6 +191,7 @@ webhooks.post("/pr", async (c) => {
             );
 
             // Step 11: Upload video to Convex storage
+            log("step 11", "uploading video");
             await updateComment("⬆️ Uploading video...");
             const uploadUrl = await convex.mutation<string>("runs:generateUploadUrl");
             const storageId = await uploadVideoFromSandbox(
@@ -179,12 +199,14 @@ webhooks.post("/pr", async (c) => {
               recording.videoPath,
               uploadUrl,
             );
+            log("step 11", `uploaded, storageId=${storageId}`);
 
             // Step 12: Get signed download URL
             const videoUrl = await convex.query<string | null>(
               "runs:getStorageUrl",
               { storageId },
             );
+            log("step 12", `videoUrl=${videoUrl ? "obtained" : "null"}`);
 
             if (videoUrl) {
               await updateComment(
@@ -194,10 +216,13 @@ webhooks.post("/pr", async (c) => {
               );
             }
 
+            log("cleanup", "destroying sandbox");
             await destroySandbox(daytona, sandbox);
+            log("done", "pipeline complete");
           } else {
             await updateComment("✅ Analysis complete. No UI changes detected — skipping video recording.");
             await destroySandbox(daytona, sandbox);
+            log("done", "no UI changes, sandbox destroyed");
           }
         } catch (innerErr) {
           // Cleanup sandbox on error during clone/update

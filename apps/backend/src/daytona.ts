@@ -90,13 +90,14 @@ export async function runSetup(
     }
   }
 
-  // Run last command (dev server) in background
+  // Run last command (dev server) in background — use bash -c with disown
+  // to ensure executeCommand returns immediately
   const lastCmd = commands[commands.length - 1];
   await sandbox.process.executeCommand(
-    `nohup ${lastCmd} > /tmp/dev-server.log 2>&1 &`,
-    cwd,
+    `bash -c 'cd ${cwd} && ${lastCmd} > /tmp/dev-server.log 2>&1 & disown'`,
     undefined,
-    10,
+    undefined,
+    30,
   );
 }
 
