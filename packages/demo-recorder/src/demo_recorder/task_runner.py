@@ -181,13 +181,26 @@ class TasksResult:
 def build_prompt(tasks: list[dict], base_url: str) -> str:
     """
     Merge all task descriptions into one numbered browser-agent instruction string.
+    Expands relative paths (e.g. /banana) to full URLs (e.g. http://localhost:3000/banana).
     """
+    # Expand relative paths like "Navigate to /path" → "Navigate to http://localhost:3000/path"
+    expanded_tasks = []
+    for task in tasks:
+        desc = task['description'].strip()
+        desc = re.sub(
+            r'Navigate to (/\S+)',
+            lambda m: f'Navigate to {base_url}{m.group(1)}',
+            desc,
+        )
+        expanded_tasks.append(desc)
+
     steps = "\n".join(
-        f"  Step {i + 1} [{task['id']}]: {task['description'].strip()}"
-        for i, task in enumerate(tasks)
+        f"  Step {i + 1} [{tasks[i]['id']}]: {desc}"
+        for i, desc in enumerate(expanded_tasks)
     )
 
     return (
+        f"The app is running at {base_url}\n\n"
         f"Complete the following verification steps in order:\n\n"
         f"{steps}\n\n"
         f"Recording instructions (important):\n"
