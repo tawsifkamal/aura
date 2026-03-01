@@ -1,0 +1,91 @@
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  border: 1px solid var(--border);
+  padding: 48px 40px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  margin-bottom: 32px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 11px;
+  font-family: var(--font-geist-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--foreground);
+}
+
+.error {
+  font-size: 13px;
+  color: #e00;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.submit {
+  padding: 12px;
+  background: var(--foreground);
+  color: var(--background);
+  border: 1px solid var(--foreground);
+  font-size: 13px;
+  font-family: var(--font-geist-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.submit:hover {
+  opacity: 0.85;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
