@@ -2,6 +2,25 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  users: defineTable({
+    githubUserId: v.number(),
+    githubLogin: v.string(),
+    accessToken: v.string(),
+    scopes: v.string(),
+    repositories: v.array(
+      v.object({
+        id: v.number(),
+        fullName: v.string(),
+        name: v.string(),
+        owner: v.string(),
+        isPrivate: v.boolean(),
+        htmlUrl: v.string(),
+        defaultBranch: v.string(),
+      }),
+    ),
+    connectedAt: v.string(),
+  }).index("by_github_user_id", ["githubUserId"]),
+
   runs: defineTable({
     timestamp: v.number(),
     branch: v.optional(v.string()),

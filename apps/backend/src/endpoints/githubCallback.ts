@@ -3,6 +3,7 @@ import { z } from "zod";
 import { type AppContext, ALLOWED_ORIGINS } from "../types";
 import { setCookie } from "hono/cookie";
 import { signSession } from "../cookie";
+import { ConvexClient } from "../convex";
 
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const GITHUB_API = "https://api.github.com";
@@ -189,7 +190,24 @@ export class GitHubCallback extends OpenAPIRoute {
       connected_at: new Date().toISOString(),
     };
 
-    await storeCredentials(credentials);
+    // Store credentials in Convex
+    const convex = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_DEPLOY_KEY);
+    await convex.mutation("users:upsert", {
+      githubUserId: user.id,
+      githubLogin: user.login,
+      accessToken: accessToken,
+      scopes,
+      repositories: repoList.map((r) => ({
+        id: r.id,
+        fullName: r.full_name,
+        name: r.name,
+        owner: r.owner,
+        isPrivate: r.private,
+        htmlUrl: r.html_url,
+        defaultBranch: r.default_branch,
+      })),
+      connectedAt: credentials.connected_at,
+    });
 
     // Build signed session cookie with user profile info
     const session = {
@@ -235,24 +253,3 @@ export class GitHubCallback extends OpenAPIRoute {
   }
 }
 
-// Placeholder — replace with your actual storage call when ready
-async function storeCredentials(credentials: {
-  github_user_id: number;
-  github_login: string;
-  access_token: string;
-  scopes: string;
-  repositories: {
-    id: number;
-    full_name: string;
-    name: string;
-    owner: string;
-    private: boolean;
-    html_url: string;
-    default_branch: string;
-  }[];
-  connected_at: string;
-}): Promise<void> {
-  console.log(
-    `[store] Saving credentials for @${credentials.github_login} (${credentials.repositories.length} repos)`
-  );
-}

@@ -1,76 +1,62 @@
 import { Hono } from "hono";
+import type { ConvexClient } from "../convex";
 
-const edits = new Hono<{ Bindings: Env }>();
-
-const STUB_VERSIONS = [
-  {
-    _id: "edit_001",
-    runId: "run_001",
-    version: 1,
-    parentVersionId: null,
-    operations: [{ type: "trim", startMs: 1000, endMs: 15000 }],
-    status: "completed",
-    videoUrl: null,
-    error: undefined,
-    createdAt: 1709281000000,
-  },
-];
+const edits = new Hono<{ Bindings: Env; Variables: { convex: ConvexClient } }>();
 
 // GET /api/runs/:runId/edits — list edit versions
-edits.get("/", (c) => {
+edits.get("/", async (c) => {
+  const convex = c.get("convex");
   const runId = c.req.param("runId");
-  const versions = STUB_VERSIONS.filter((v) => v.runId === runId);
+
+  const versions = await convex.query("edits:listVersions", { runId });
   return c.json(versions);
 });
 
 // POST /api/runs/:runId/edits — apply edit
 edits.post("/", async (c) => {
+  const convex = c.get("convex");
   const runId = c.req.param("runId");
   const body = await c.req.json();
-  const id = `edit_${crypto.randomUUID().slice(0, 8)}`;
 
-  return c.json({
-    _id: id,
+  const versionId = await convex.mutation<string>("edits:applyEdit", {
     runId,
-    version: (STUB_VERSIONS.length + 1),
-    parentVersionId: body.parentVersionId ?? null,
-    operations: [body.operation],
-    status: "pending",
-    videoUrl: null,
-    error: undefined,
-    createdAt: Date.now(),
+    parentVersionId: body.parentVersionId,
+    operation: body.operation,
   });
+
+  // Fetch the full created version to return
+  const version = await convex.query("edits:getVersion", { id: versionId });
+  return c.json(version);
 });
 
 // POST /api/runs/:runId/edits/revert — revert to original
 edits.post("/revert", async (c) => {
+  const convex = c.get("convex");
   const runId = c.req.param("runId");
-  const id = `edit_${crypto.randomUUID().slice(0, 8)}`;
 
-  return c.json({
-    _id: id,
-    runId,
-    version: 0,
-    parentVersionId: null,
-    operations: [],
-    status: "completed",
-    videoUrl: null,
-    error: undefined,
-    createdAt: Date.now(),
-  });
+  const versionId = await convex.mutation<string>("edits:revert", { runId });
+
+  const version = await convex.query("edits:getVersion", { id: versionId });
+  return c.json(version);
 });
 
 // PATCH /api/edits/:editId/status — update edit version status (pipeline use)
 edits.patch("/:editId/status", async (c) => {
+  const convex = c.get("convex");
   const { editId } = c.req.param();
   const body = await c.req.json();
+
+  await convex.mutation("edits:updateVersionStatus", {
+    id: editId,
+    status: body.status,
+    videoStorageId: body.videoStorageId,
+    error: body.error,
+  });
 
   return c.json({
     success: true,
     editId,
     status: body.status,
-    videoStorageId: body.videoStorageId,
-    error: body.error,
   });
 });
 

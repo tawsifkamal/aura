@@ -1,6 +1,7 @@
 import type { Context } from "hono";
+import type { ConvexClient } from "./convex";
 
-export type AppContext = Context<{ Bindings: Env }>;
+export type AppContext = Context<{ Bindings: Env; Variables: { convex: ConvexClient } }>;
 
 // Add more origins here as needed
 export const ALLOWED_ORIGINS = [
@@ -14,5 +15,7 @@ declare global {
     GITHUB_CLIENT_SECRET: string;
     GITHUB_REDIRECT_URI: string;
     COOKIE_SECRET: string;
+    CONVEX_URL: string;
+    CONVEX_DEPLOY_KEY: string;
   }
 }

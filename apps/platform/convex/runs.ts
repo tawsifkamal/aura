@@ -170,3 +170,26 @@ export const generateUploadUrl: RegisteredMutation<
     return ctx.storage.generateUploadUrl();
   },
 });
+
+export const updateAnnotations = mutation({
+  args: {
+    id: v.id("runs"),
+    annotations: v.array(
+      v.object({
+        task: v.string(),
+        path: v.string(),
+        startMs: v.number(),
+        endMs: v.number(),
+        x: v.number(),
+        y: v.number(),
+      }),
+    ),
+    subtitlesVtt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      annotationSections: args.annotations,
+      subtitlesVtt: args.subtitlesVtt,
+    });
+  },
+});

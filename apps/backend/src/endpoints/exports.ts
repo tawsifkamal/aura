@@ -1,46 +1,24 @@
 import { Hono } from "hono";
+import type { ConvexClient } from "../convex";
 
-const exports_ = new Hono<{ Bindings: Env }>();
-
-const STUB_EXPORTS = [
-  {
-    _id: "export_001",
-    _creationTime: 1709282000000,
-    runId: "run_001",
-    editVersionId: undefined,
-    format: "mp4",
-    fps: 30,
-    width: 1920,
-    height: 1080,
-    quality: "web",
-    maxFileSizeMb: undefined,
-    status: "completed",
-    progress: 100,
-    eta: undefined,
-    outputUrl: null,
-    fileSizeBytes: 4200000,
-    error: undefined,
-    createdAt: 1709282000000,
-    completedAt: 1709282060000,
-  },
-];
+const exports_ = new Hono<{ Bindings: Env; Variables: { convex: ConvexClient } }>();
 
 // GET /api/runs/:runId/exports — list export jobs
-exports_.get("/", (c) => {
+exports_.get("/", async (c) => {
+  const convex = c.get("convex");
   const runId = c.req.param("runId");
-  const jobs = STUB_EXPORTS.filter((j) => j.runId === runId);
+
+  const jobs = await convex.query("exports:list", { runId });
   return c.json(jobs);
 });
 
 // POST /api/runs/:runId/exports — create export job
 exports_.post("/", async (c) => {
+  const convex = c.get("convex");
   const runId = c.req.param("runId");
   const body = await c.req.json();
-  const id = `export_${crypto.randomUUID().slice(0, 8)}`;
 
-  return c.json({
-    _id: id,
-    _creationTime: Date.now(),
+  const jobId = await convex.mutation<string>("exports:create", {
     runId,
     editVersionId: body.editVersionId,
     format: body.format ?? "mp4",
@@ -49,56 +27,68 @@ exports_.post("/", async (c) => {
     height: body.height ?? 1080,
     quality: body.quality ?? "web",
     maxFileSizeMb: body.maxFileSizeMb,
-    status: "queued",
-    progress: 0,
-    eta: undefined,
-    outputUrl: null,
-    fileSizeBytes: undefined,
-    error: undefined,
-    createdAt: Date.now(),
-    completedAt: undefined,
   });
+
+  // Fetch the full created job to return
+  const job = await convex.query("exports:get", { id: jobId });
+  return c.json(job);
 });
 
 // PATCH /api/exports/:exportId/progress — update export progress (pipeline use)
 exports_.patch("/:exportId/progress", async (c) => {
+  const convex = c.get("convex");
   const { exportId } = c.req.param();
   const body = await c.req.json();
+
+  await convex.mutation("exports:updateProgress", {
+    id: exportId,
+    progress: body.progress,
+    status: body.status,
+    eta: body.eta,
+  });
 
   return c.json({
     success: true,
     exportId,
     progress: body.progress,
     status: body.status,
-    eta: body.eta,
   });
 });
 
 // POST /api/exports/:exportId/complete — mark export complete
 exports_.post("/:exportId/complete", async (c) => {
+  const convex = c.get("convex");
   const { exportId } = c.req.param();
   const body = await c.req.json();
+
+  await convex.mutation("exports:complete", {
+    id: exportId,
+    outputStorageId: body.outputStorageId,
+    fileSizeBytes: body.fileSizeBytes,
+  });
 
   return c.json({
     success: true,
     exportId,
     status: "completed",
-    outputStorageId: body.outputStorageId,
-    fileSizeBytes: body.fileSizeBytes,
-    completedAt: Date.now(),
   });
 });
 
 // POST /api/exports/:exportId/fail — mark export failed
 exports_.post("/:exportId/fail", async (c) => {
+  const convex = c.get("convex");
   const { exportId } = c.req.param();
   const body = await c.req.json();
+
+  await convex.mutation("exports:fail", {
+    id: exportId,
+    error: body.error,
+  });
 
   return c.json({
     success: true,
     exportId,
     status: "failed",
-    error: body.error,
   });
 });
 
