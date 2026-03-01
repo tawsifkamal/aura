@@ -74,7 +74,7 @@
         "Execute interactions via browser-use"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "This is the smart part - Claude reads diff and decides actions"
     },
     {

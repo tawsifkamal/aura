@@ -74,3 +74,19 @@
   - Laminar and Supermemory are optional integrations — gate on env vars (LAMINAR_ENDPOINT, SUPERMEMORY_ENDPOINT)
   - Session ID format YYYYMMDD-HHMMSS doubles as the demos/ subfolder name
 ---
+
+## 2026-02-28 - US-005
+- Created `interaction-planner.ts` in `packages/core/src/` for AI-driven interaction planning
+- `extractInteractiveElements()`: parses diff hunks for added HTML/JSX elements (button, input, form, etc.), ARIA roles, and event handlers (onClick, onSubmit, onChange)
+- Smart selector extraction with priority: id > data-testid > aria-label > className > text content > tag fallback
+- `generateInteractionPlan()`: maps elements to routes, deduplicates, sorts by confidence then action type, returns structured step list
+- Graceful handling: missing elements are skipped without failing the recording
+- Updated skill prompt Step 4 with detailed interaction plan generation and execution instructions
+- Files changed: `packages/core/src/interaction-planner.ts` (new), `packages/core/src/index.ts` (updated), `.claude/commands/record-demo.md` (updated)
+- **Learnings for future iterations:**
+  - Use global regex patterns with `lastIndex = 0` reset before each test to avoid missed matches
+  - Selector extraction from JSX is best-effort — data-testid is the most reliable
+  - Event handler detection (onClick etc.) serves as a fallback when no HTML element is directly visible in the diff
+  - Diff hunks keyed by file path allow mapping elements back to their source route
+  - Wait times vary by action: 500ms for clicks, 2000ms for form submissions
+---
