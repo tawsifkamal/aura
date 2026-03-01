@@ -1,77 +1,105 @@
+"""
+cli.py — CLI entry point for demo-recorder.
+
+Called by Claude Code (or any agent) to record a UI verification session.
+
+Usage:
+    python -m demo_recorder.cli --tasks '[{"id":"login-success","description":"..."}]' --base-url http://localhost:3000
+
+Output (stdout, parseable by the caller):
+    VERDICT: pass
+    REASONING: Both verification steps completed successfully...
+    VIDEO: /path/to/demos/2026-03-01-120000/recording.mp4
+    OUTPUT_DIR: /path/to/demos/2026-03-01-120000
+"""
+
 import argparse
 import asyncio
+import json
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .recorder import record_demo
-
 load_dotenv()
 
+from demo_recorder.task_runner import run_tasks
 
-def main():
+
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Record video demos of web app changes"
+        description="Run browser-use demo recorder from the CLI",
     )
     parser.add_argument(
-        "--repo",
-        "-r",
-        default=".",
-        help="Path to git repository (default: current directory)",
+        "--tasks",
+        type=str,
+        required=True,
+        help='JSON array of tasks: \'[{"id": "step-1", "description": "..."}]\'',
     )
     parser.add_argument(
-        "--output",
-        "-o",
-        help="Output directory for recordings (default: demos/YYYY-MM-DD-HHMMSS)",
-    )
-    parser.add_argument(
-        "--url",
-        "-u",
+        "--base-url",
+        type=str,
         default="http://localhost:3000",
-        help="Base URL of the app (default: http://localhost:3000)",
+        help="Base URL of the running app (default: http://localhost:3000)",
     )
     parser.add_argument(
-        "--task",
-        "-t",
-        help="Custom task for the agent (default: auto-generated from git diff)",
-    )
-    parser.add_argument(
-        "--steps",
-        "-s",
+        "--max-steps",
         type=int,
-        default=10,
-        help="Maximum steps for the agent (default: 10)",
+        default=None,
+        help="Maximum agent steps (optional)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Override output directory (optional)",
     )
     parser.add_argument(
         "--model",
-        "-m",
+        type=str,
         default="browser-use",
-        help="Model to use (default: browser-use). Also supports claude-*, gpt-*, gemini-*",
+        help="LLM model: browser-use (default), claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash",
     )
-
     args = parser.parse_args()
 
+    # Parse tasks JSON
     try:
-        output_path = asyncio.run(
-            record_demo(
-                repo_path=args.repo,
-                output_dir=args.output,
-                base_url=args.url,
-                task=args.task,
-                max_steps=args.steps,
-                model=args.model,
-            )
-        )
-        print(f"\nDemo saved to: {output_path}")
-        print("Files:")
-        for f in output_path.iterdir():
-            print(f"  - {f.name}")
-    except KeyboardInterrupt:
-        print("\nRecording cancelled")
+        tasks = json.loads(args.tasks)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: --tasks is not valid JSON: {e}", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}")
+
+    if not isinstance(tasks, list) or not tasks:
+        print("ERROR: --tasks must be a non-empty JSON array", file=sys.stderr)
+        sys.exit(1)
+
+    # Run the demo
+    result = asyncio.run(
+        run_tasks(
+            tasks=tasks,
+            base_url=args.base_url,
+            output_dir=args.output_dir,
+            max_steps=args.max_steps,
+            model=args.model,
+        )
+    )
+
+    # Find the video file (trimmed recording.mp4 preferred, fallback to raw)
+    video_path = None
+    for pattern in ("recording.mp4", "*.mp4", "*.webm"):
+        matches = list(result.output_path.glob(pattern))
+        if matches:
+            video_path = matches[0]
+            break
+
+    # Structured output Claude Code can parse
+    print(f"VERDICT: {result.verdict or 'unknown'}")
+    print(f"REASONING: {result.verdict_reasoning or ''}")
+    print(f"VIDEO: {video_path or 'not found'}")
+    print(f"OUTPUT_DIR: {result.output_path}")
+
+    if not result.success:
+        print(f"ERROR: {result.error}", file=sys.stderr)
         sys.exit(1)
 
 
