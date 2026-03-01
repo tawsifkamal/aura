@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Record video demos of web app changes using browser-use"
 requires-python = ">=3.11"
 dependencies = [
-    "browser-use>=0.12.0",
+    "browser-use[video]>=0.12.0",
     "langchain-openai>=0.3.0",
     "langchain-anthropic>=0.3.0",
     "langchain-google-genai>=2.0.0",
