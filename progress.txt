@@ -361,3 +361,18 @@
   - `generateZoomKeyframes()` takes `(steps, cursorKeyframes, preset)` — 3 args
   - `buildFFmpegCompositeCommand()` returns `FFmpegCommand` object `{ executable, args, description }`, not a string array
 ---
+
+## 2026-02-28 - US-021
+- Added `"test"` and `"validate"` scripts to root `package.json`
+- `npm run validate` runs `turbo run check-types lint test build` as a single command
+- Ran full validation: all 11 turbo tasks pass across all packages
+  - **check-types**: PASS (web, @repo/core, @repo/ui, @aura/webhook)
+  - **lint**: PASS (web, @repo/core, @repo/ui, @aura/webhook) — zero warnings
+  - **test**: PASS (123 tests across 9 test files in @repo/core)
+  - **build**: PASS (web via next build, @aura/webhook via tsc)
+- No fixes needed — all quality gates green
+- Files changed: `package.json`
+- **Learnings for future iterations:**
+  - Use `turbo run check-types lint test build` to run all quality gates in dependency-aware parallel order
+  - Turbo caches test results — run `turbo run test --force` to force re-execution
+---

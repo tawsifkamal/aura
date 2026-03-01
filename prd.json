@@ -339,7 +339,7 @@
         "Validation script can be run as a single command (e.g., npm run validate or a composite script)"
       ],
       "priority": 21,
-      "passes": false,
+      "passes": true,
       "notes": "This is the quality gate — nothing ships unless typecheck + lint + tests + build all pass. The agent should iterate on fixes, not just report failures"
     },
     {
