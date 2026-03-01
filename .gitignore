@@ -37,6 +37,26 @@ yarn-error.log*
 # Demo recordings (generated)
 demos/
 
+# Video processing outputs
+output/
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
+*.gif
+
+# Test scripts and payloads
+test-*.js
+test-*.json
+test-*.ts
+
+# Temporary processing files
+*.tmp
+*.temp
+render-manifest.json
+filter_complex.txt
+
 # Python
 __pycache__/
 *.py[cod]
