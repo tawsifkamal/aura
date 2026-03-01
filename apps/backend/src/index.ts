@@ -2,6 +2,7 @@ import { fromHono } from "chanfana";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ALLOWED_ORIGINS } from "./types";
+import { ConvexClient } from "./convex";
 import { GitHubAuthRedirect } from "./endpoints/githubAuth";
 import { GitHubCallback } from "./endpoints/githubCallback";
 import { SessionInfo } from "./endpoints/sessionInfo";
@@ -10,7 +11,7 @@ import { runs } from "./endpoints/runs";
 import { edits } from "./endpoints/edits";
 import { exports_ } from "./endpoints/exports";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: { convex: ConvexClient } }>();
 
 // CORS — allow credentials (cookies) from allowed origins
 app.use(
@@ -26,6 +27,13 @@ app.use(
   })
 );
 
+// Convex client middleware — inject on all /api/* routes
+app.use("/api/*", async (c, next) => {
+  const client = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_DEPLOY_KEY);
+  c.set("convex", client);
+  await next();
+});
+
 const openapi = fromHono(app, {
   docs_url: "/",
 });
@@ -36,16 +44,74 @@ openapi.get("/api/auth/callback/github", GitHubCallback);
 openapi.get("/api/auth/session", SessionInfo);
 openapi.post("/api/auth/logout", Logout);
 
-// Data endpoints (stub data for now)
+// Data endpoints (backed by Convex)
 app.route("/api/runs", runs);
 app.route("/api/runs/:runId/edits", edits);
 app.route("/api/runs/:runId/exports", exports_);
 
-// Upload URL endpoint (stub)
-app.post("/api/upload-url", (c) => {
-  return c.json({
-    uploadUrl: `https://stub-upload.example.com/${crypto.randomUUID()}`,
+// Top-level ID-based routes for pipeline consumers
+app.patch("/api/edits/:editId/status", async (c) => {
+  const convex = c.get("convex");
+  const { editId } = c.req.param();
+  const body = await c.req.json();
+
+  await convex.mutation("edits:updateVersionStatus", {
+    id: editId,
+    status: body.status,
+    videoStorageId: body.videoStorageId,
+    error: body.error,
   });
+
+  return c.json({ success: true, editId, status: body.status });
+});
+
+app.patch("/api/exports/:exportId/progress", async (c) => {
+  const convex = c.get("convex");
+  const { exportId } = c.req.param();
+  const body = await c.req.json();
+
+  await convex.mutation("exports:updateProgress", {
+    id: exportId,
+    progress: body.progress,
+    status: body.status,
+    eta: body.eta,
+  });
+
+  return c.json({ success: true, exportId, progress: body.progress });
+});
+
+app.post("/api/exports/:exportId/complete", async (c) => {
+  const convex = c.get("convex");
+  const { exportId } = c.req.param();
+  const body = await c.req.json();
+
+  await convex.mutation("exports:complete", {
+    id: exportId,
+    outputStorageId: body.outputStorageId,
+    fileSizeBytes: body.fileSizeBytes,
+  });
+
+  return c.json({ success: true, exportId, status: "completed" });
+});
+
+app.post("/api/exports/:exportId/fail", async (c) => {
+  const convex = c.get("convex");
+  const { exportId } = c.req.param();
+  const body = await c.req.json();
+
+  await convex.mutation("exports:fail", {
+    id: exportId,
+    error: body.error,
+  });
+
+  return c.json({ success: true, exportId, status: "failed" });
+});
+
+// Upload URL endpoint — generates Convex storage upload URL
+app.post("/api/upload-url", async (c) => {
+  const convex = c.get("convex");
+  const uploadUrl = await convex.mutation<string>("runs:generateUploadUrl");
+  return c.json({ uploadUrl });
 });
 
 export default app;
