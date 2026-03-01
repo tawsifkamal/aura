@@ -102,6 +102,28 @@ export type {
 } from "./pr-bot.js";
 
 export {
+  sendEmail,
+  getAgentMailConfig,
+} from "./agentmail.js";
+export type {
+  AgentMailConfig,
+  EmailPayload,
+  SendResult,
+} from "./agentmail.js";
+
+export {
+  storeRunContext,
+  retrieveContext,
+  mergeContextIntoPrompt,
+  getSupermemoryConfig,
+} from "./supermemory.js";
+export type {
+  SupermemoryConfig as SupermemoryClientConfig,
+  RunContext,
+  RetrievedContext,
+} from "./supermemory.js";
+
+export {
   createTrace,
   startSpan,
   endSpan,
