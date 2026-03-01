@@ -44,4 +44,34 @@ export default defineSchema({
   })
     .index("by_run", ["runId"])
     .index("by_status", ["status"]),
+
+  exportJobs: defineTable({
+    runId: v.id("runs"),
+    editVersionId: v.optional(v.id("editVersions")),
+    format: v.union(v.literal("mp4"), v.literal("gif")),
+    fps: v.number(),
+    width: v.number(),
+    height: v.number(),
+    quality: v.union(
+      v.literal("web"),
+      v.literal("high"),
+      v.literal("preview"),
+    ),
+    maxFileSizeMb: v.optional(v.number()),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    progress: v.number(),
+    eta: v.optional(v.string()),
+    outputStorageId: v.optional(v.id("_storage")),
+    fileSizeBytes: v.optional(v.number()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_run", ["runId"])
+    .index("by_status", ["status"]),
 });

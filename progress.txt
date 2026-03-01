@@ -226,3 +226,33 @@
   - Always send both HTML and text versions for email compatibility
   - Return structured error results instead of throwing — caller decides how to handle delivery failures
 ---
+
+## 2026-02-28 - US-014
+- Created `edits.ts` in `apps/web/convex/` with full editing API: crop, trim, split, zoom, cursor_emphasis, style_preset operations
+- Added `editVersions` table to Convex schema with indexes by_run and by_status
+- Operations are non-destructive: each edit creates a new version with parent chain, operations accumulate
+- Revert creates a version 0 with empty operations to restore original
+- Editor UI at `apps/web/app/runs/[runId]/edit/page.tsx`: tabbed interface for each operation, version history, preview
+- Run detail page now has "Edit" link for completed runs
+- Files changed: `apps/web/convex/edits.ts` (new), `apps/web/convex/schema.ts`, `apps/web/convex/_generated/api.d.ts`, `apps/web/app/runs/[runId]/edit/page.tsx` (new), `apps/web/app/runs/[runId]/edit/page.module.css` (new), `apps/web/app/runs/[runId]/page.tsx`
+- **Learnings for future iterations:**
+  - Use `Value` type from `convex/values` for generic arrays stored in Convex (not `unknown[]`)
+  - Destructure mutation args explicitly when patching to avoid `Record<string, unknown>` not assignable to `PatchValue` errors
+  - Version numbering via count of existing versions + 1 is simple but not idempotent — acceptable for this use case
+  - CSS Modules `composes` for button variants keeps styling DRY across edit panels
+---
+
+## 2026-02-28 - US-015
+- Created `exports.ts` in `apps/web/convex/` with export job CRUD: create, list, get, updateProgress, complete, fail
+- Added `exportJobs` table to Convex schema with indexes by_run and by_status
+- Export page at `apps/web/app/runs/[runId]/export/page.tsx`: format (MP4/GIF), quality presets (preview/web/high), FPS (24/30/60), resolution (480p/720p/1080p), optional max file size
+- Export jobs list shows progress bars, status badges, ETA, file size, download links, and error messages
+- Run detail page now has "Export" link alongside "Edit" for completed runs
+- Added `ExportJob` type to `apps/web/app/types.ts`
+- Updated `_generated/api.d.ts` to include exports module
+- Files changed: `apps/web/convex/exports.ts` (new), `apps/web/convex/schema.ts`, `apps/web/convex/_generated/api.d.ts`, `apps/web/app/types.ts`, `apps/web/app/runs/[runId]/page.tsx`, `apps/web/app/runs/[runId]/export/page.tsx` (new), `apps/web/app/runs/[runId]/export/page.module.css` (new)
+- **Learnings for future iterations:**
+  - Use nullish coalescing (`?? RESOLUTION_OPTIONS[0]`) for array index access to satisfy strict TS checks
+  - Export jobs follow the same pattern as run status lifecycle but with their own progress/ETA tracking
+  - Convex storage URLs for export outputs are resolved at query time using `ctx.storage.getUrl()`
+---
