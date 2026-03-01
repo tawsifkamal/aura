@@ -171,6 +171,10 @@ export const generateUploadUrl: RegisteredMutation<
   },
 });
 
+export const getStorageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return ctx.storage.getUrl(args.storageId);
 export const updateAnnotations = mutation({
   args: {
     id: v.id("runs"),

@@ -45,7 +45,7 @@ export default function LoginPage() {
             <input
               id="username"
               type="text"
-              autoComplete="username"
+              autoComplete="off"
               placeholder="e.g. admin"
               className={styles.input}
               value={username}
@@ -60,7 +60,7 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="off"
               placeholder="••••••••"
               className={styles.input}
               value={password}
