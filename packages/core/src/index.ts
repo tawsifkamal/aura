@@ -157,6 +157,23 @@ export type {
 } from "./sandbox.js";
 
 export {
+  deliverToAllChannels,
+  getComposioConfig,
+  isComposioAvailable,
+  buildConnectionUrl,
+  checkConnection,
+} from "./composio-delivery.js";
+export type {
+  ChannelType,
+  ChannelConfig,
+  DeliveryPreferences,
+  DeliveryPayload,
+  ChannelDeliveryResult,
+  DeliveryResult,
+  ComposioConfig,
+} from "./composio-delivery.js";
+
+export {
   getAWSPipelineConfig,
   isAWSAvailable,
   buildMediaConvertJobSpec,

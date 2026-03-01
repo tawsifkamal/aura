@@ -297,3 +297,22 @@
   - New monorepo apps need `npm install` to register them in workspaces before turbo can find them
   - Add `dist/**` to turbo build outputs for tsc-compiled apps alongside `.next/**`
 ---
+
+## 2026-02-28 - US-018
+- Created `composio-delivery.ts` in `packages/core/src/` for multi-channel delivery via Composio
+- `deliverToAllChannels()`: orchestrates parallel delivery to all enabled channels, falls back to AgentMail email
+- Supports 6 channel types: Slack, Discord, Teams, Telegram, email, and generic webhooks
+- Channel-specific message formatting: Slack blocks, Discord embeds, plain text for Teams/Telegram
+- `buildConnectionUrl()`: generates Composio OAuth initiation URLs for connecting new channels
+- `checkConnection()`: verifies active integration status via Composio connected accounts API
+- Graceful degradation: if Composio unavailable or all channels fail, falls back to AgentMail (US-013)
+- Per-channel delivery failures are captured individually without blocking other channels
+- Added `COMPOSIO_API_KEY`, `COMPOSIO_BASE_URL` to `turbo.json` `globalEnv`
+- Files changed: `packages/core/src/composio-delivery.ts` (new), `packages/core/src/index.ts`, `turbo.json`
+- **Learnings for future iterations:**
+  - Composio API uses `x-api-key` header (not `Authorization: Bearer`)
+  - Composio action execution endpoint: `POST /api/v1/actions/{action}/execute` with `{ input: params }`
+  - Slack Block Kit messages need `type: "mrkdwn"` (not "markdown")
+  - Discord embeds use numeric color codes (0x000000 for black)
+  - Webhook channels don't need Composio OAuth — they just receive POST requests directly
+---
