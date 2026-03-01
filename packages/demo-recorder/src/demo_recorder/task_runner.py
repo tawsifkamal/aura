@@ -13,15 +13,81 @@ Input shape (from upstream agent like Claude Code):
     ]
 """
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
 
+import httpx
 from browser_use import Agent, Browser
 
 from .recorder import get_llm
+
+
+async def upload_to_convex(convex_url: str, video_path: Path) -> str | None:
+    """
+    Upload video to Convex blob storage and return the viewable URL.
+
+    1. Call runs:generateUploadUrl to get a signed upload URL
+    2. POST the video file to that URL
+    3. Get back storageId
+    4. Call runs:getVideoUrl to get the viewable URL
+    """
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        # Step 1: Get upload URL
+        gen_res = await client.post(
+            f"{convex_url}/api/mutation",
+            json={"path": "runs:generateUploadUrl", "args": {}, "format": "json"},
+        )
+        if gen_res.status_code != 200:
+            print(f"  ⚠️ Failed to get upload URL: {gen_res.status_code}")
+            return None
+
+        upload_url = gen_res.json().get("value")
+        if not upload_url:
+            print("  ⚠️ No upload URL returned")
+            return None
+
+        # Step 2: Upload the video file
+        video_bytes = video_path.read_bytes()
+        ext = video_path.suffix.lower()
+        mime_types = {".mp4": "video/mp4", ".webm": "video/webm"}
+        content_type = mime_types.get(ext, "application/octet-stream")
+
+        upload_res = await client.post(
+            upload_url,
+            content=video_bytes,
+            headers={"Content-Type": content_type},
+        )
+        if upload_res.status_code != 200:
+            print(f"  ⚠️ Failed to upload video: {upload_res.status_code}")
+            return None
+
+        storage_id = upload_res.json().get("storageId")
+        if not storage_id:
+            print("  ⚠️ No storageId returned")
+            return None
+
+        # Step 3: Get the viewable URL via a query
+        url_res = await client.post(
+            f"{convex_url}/api/query",
+            json={
+                "path": "runs:getStorageUrl",
+                "args": {"storageId": storage_id},
+                "format": "json",
+            },
+        )
+        if url_res.status_code == 200:
+            video_url = url_res.json().get("value")
+            if video_url:
+                print(f"  ✅ Uploaded to Convex: {video_url[:80]}...")
+                return video_url
+
+        # Fallback: return storage ID if we can't get URL
+        print(f"  ✅ Uploaded to Convex (storageId: {storage_id})")
+        return f"convex:storage:{storage_id}"
 
 
 def trim_black_opening(video_path: Path) -> Path:
@@ -85,6 +151,7 @@ class TasksResult:
     verdict: str | None = None       # "pass" / "fail" / None if unknown
     verdict_reasoning: str | None = None
     error: str | None = None
+    video_url: str | None = None     # Convex signed URL if uploaded
 
 
 def build_prompt(tasks: list[dict], base_url: str) -> str:
@@ -117,6 +184,7 @@ async def run_tasks(
     output_dir: str | Path | None = None,
     model: str = "browser-use",
     max_steps: int | None = None,
+    convex_url: str | None = None,
 ) -> TasksResult:
     """
     Run all tasks as one browser agent session, recording a single video.
@@ -185,7 +253,6 @@ async def run_tasks(
             ground_truth=ground_truth,
             # Explicit initial navigation — bypasses directly_open_url regex
             # (which silently bails when >1 unique URL is found in the prompt)
-            initial_actions=[{"navigate": {"url": start_url, "new_tab": False}}],
         )
 
         # agent.run() auto-closes the browser session internally (await self.close() in its own finally block)
@@ -212,8 +279,15 @@ async def run_tasks(
 
         # Trim about:blank / black opening from the recorded video
         video_files = list(output_dir.glob("*.mp4")) + list(output_dir.glob("*.webm"))
+        final_video_path: Path | None = None
         for video_file in video_files:
-            trim_black_opening(video_file)
+            final_video_path = trim_black_opening(video_file)
+
+        # Upload to Convex if URL provided
+        video_url: str | None = None
+        if convex_url and final_video_path and final_video_path.exists():
+            print(f"  Uploading to Convex...")
+            video_url = await upload_to_convex(convex_url, final_video_path)
 
         # Write summary
         summary_path = output_dir / "summary.md"
@@ -231,6 +305,8 @@ async def run_tasks(
         )
 
         print(f"✓ Recording complete → {output_dir}")
+        if video_url:
+            print(f"VIDEO_URL: {video_url}")
         return TasksResult(
             tasks=tasks,
             prompt=prompt,
@@ -238,6 +314,7 @@ async def run_tasks(
             success=True,
             verdict=verdict,
             verdict_reasoning=verdict_reasoning,
+            video_url=video_url,
         )
 
     except Exception as exc:  # noqa: BLE001
