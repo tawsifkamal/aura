@@ -15,16 +15,88 @@ Input shape (from upstream agent like Claude Code):
 
 import os
 import re
+import signal
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
 
 import httpx
-from browser_use import Agent, Browser, BrowserProfile
+from browser_use import Agent, BrowserProfile
 
 from .recorder import get_llm
 
+
+# ── Xvfb + ffmpeg screen recording ────────────────────────────────────
+
+def start_xvfb(display: str = ":99", resolution: str = "1920x1080x24") -> subprocess.Popen:
+    """Start a virtual X display."""
+    proc = subprocess.Popen(
+        ["Xvfb", display, "-screen", "0", resolution, "-ac", "-nolisten", "tcp"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    os.environ["DISPLAY"] = display
+    time.sleep(1)  # give Xvfb time to initialize
+    print(f"  Xvfb started on {display} ({resolution})")
+    return proc
+
+
+def start_screen_recording(
+    output_path: Path,
+    display: str = ":99",
+    resolution: str = "1920x1080",
+    fps: int = 25,
+) -> subprocess.Popen:
+    """Start ffmpeg screen capture of the virtual display."""
+    proc = subprocess.Popen(
+        [
+            "ffmpeg",
+            "-f", "x11grab",
+            "-video_size", resolution,
+            "-framerate", str(fps),
+            "-i", display,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-y",
+            str(output_path),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    print(f"  Screen recording started → {output_path.name}")
+    return proc
+
+
+def stop_screen_recording(proc: subprocess.Popen | None) -> None:
+    """Stop ffmpeg gracefully by sending 'q' to flush the file."""
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        proc.stdin.write(b"q")
+        proc.stdin.flush()
+        proc.wait(timeout=10)
+        print("  Screen recording stopped")
+    except Exception:
+        proc.kill()
+        proc.wait(timeout=5)
+
+
+def stop_xvfb(proc: subprocess.Popen | None) -> None:
+    """Terminate the Xvfb process."""
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+# ── Convex upload ──────────────────────────────────────────────────────
 
 async def upload_to_convex(convex_url: str, video_path: Path) -> str | None:
     """
@@ -90,57 +162,7 @@ async def upload_to_convex(convex_url: str, video_path: Path) -> str | None:
         return f"convex:storage:{storage_id}"
 
 
-def trim_black_opening(video_path: Path) -> Path:
-    """
-    Use ffmpeg blackdetect to find where real content starts and trim the
-    about:blank / black opening frames from the recording.
-
-    Returns the trimmed video path (replaces original in-place).
-    Falls back and returns original path if ffmpeg is not available.
-    """
-    try:
-        # Run blackdetect to find black intervals
-        result = subprocess.run(
-            [
-                "ffmpeg", "-i", str(video_path),
-                "-vf", "blackdetect=d=0.3:pix_th=0.15",
-                "-an", "-f", "null", "/dev/null",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        # Parse black_end times from stderr output
-        black_ends = re.findall(
-            r"black_end:(\d+\.?\d*)",
-            result.stderr,
-        )
-        if not black_ends:
-            return video_path  # no black opening detected
-
-        trim_start = float(black_ends[0])  # end of first black segment
-        if trim_start < 0.5:
-            return video_path  # too short to bother trimming
-
-        trimmed_path = video_path.with_name("recording.mp4")
-        subprocess.run(
-            [
-                "ffmpeg", "-i", str(video_path),
-                "-ss", str(trim_start),
-                "-c", "copy",
-                str(trimmed_path),
-                "-y",
-            ],
-            check=True,
-            capture_output=True,
-        )
-        video_path.unlink()  # remove the un-trimmed original
-        print(f"  Trimmed {trim_start:.1f}s of blank opening → {trimmed_path.name}")
-        return trimmed_path
-
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        # ffmpeg not installed or failed — return original untouched
-        return video_path
-
+# ── Data types ─────────────────────────────────────────────────────────
 
 @dataclass
 class TasksResult:
@@ -154,12 +176,11 @@ class TasksResult:
     video_url: str | None = None     # Convex signed URL if uploaded
 
 
+# ── Prompt builder ─────────────────────────────────────────────────────
+
 def build_prompt(tasks: list[dict], base_url: str) -> str:
     """
     Merge all task descriptions into one numbered browser-agent instruction string.
-
-    Each task's `id` becomes a labeled step marker so it maps to a point in
-    the recorded video timeline. All steps run in a single browser session.
     """
     steps = "\n".join(
         f"  Step {i + 1} [{task['id']}]: {task['description'].strip()}"
@@ -171,13 +192,12 @@ def build_prompt(tasks: list[dict], base_url: str) -> str:
         f"{steps}\n\n"
         f"Recording instructions (important):\n"
         f"- Complete ALL steps in sequence — do not skip any.\n"
-        f"- Wait 1-2 seconds between each action so interactions are clearly visible.\n"
-        f"- After filling a field, pause briefly before clicking submit.\n"
-        f"- After each step completes, pause 2 seconds before starting the next step.\n"
         f"- If a step cannot be completed (element not found, page error, etc.), stop immediately and report failure. Do not retry endlessly.\n"
         f"- Do not close the browser when done."
     )
 
+
+# ── Main runner ────────────────────────────────────────────────────────
 
 async def run_tasks(
     tasks: list[dict],
@@ -191,15 +211,14 @@ async def run_tasks(
     """
     Run all tasks as one browser agent session, recording a single video.
 
-    Args:
-        tasks:      List of {"id": str, "description": str} dicts.
-        base_url:   Base URL of the running app.
-        output_dir: Where to save the video and summary. Defaults to demos/<timestamp>/.
-        model:      LLM model (e.g. "browser-use", "gpt-4o", "claude-3-5-sonnet-latest").
-        max_steps:  Max agent steps. Defaults to len(tasks) * 8.
+    When headless=True (container/CI mode):
+      - Starts Xvfb virtual display at :99 (1920x1080)
+      - Runs browser NON-headless on the virtual display
+      - Uses ffmpeg x11grab to screen-record the display
+      - Produces a clean MP4 from real rendered pixels
 
-    Returns:
-        TasksResult with the output path and success flag.
+    When headless=False (local dev with real display):
+      - Uses Playwright's built-in record_video_dir
     """
     # Resolve output directory
     if output_dir is None:
@@ -228,28 +247,38 @@ async def run_tasks(
     print(prompt)
     print("-" * 60 + "\n")
 
+    xvfb_proc = None
+    ffmpeg_proc = None
+    use_xvfb = headless  # use virtual display in container mode
+
     try:
-        browser_profile = BrowserProfile(
-            headless=headless,
-            record_video_dir=str(output_dir),
-            record_video_size={"width": 1920, "height": 1080},
-            wait_between_actions=1.5,
-            minimum_wait_page_load_time=1.0,
-        )
+        # ── Set up virtual display if in container mode ──
+        if use_xvfb:
+            xvfb_proc = start_xvfb(":99", "1920x1080x24")
+
+        # ── Configure browser ──
+        if use_xvfb:
+            # Non-headless on virtual display, no Playwright recording
+            browser_profile = BrowserProfile(
+                headless=False,
+                wait_between_actions=1.5,
+                minimum_wait_page_load_time=1.0,
+            )
+        else:
+            # Local dev: use Playwright's built-in recording
+            browser_profile = BrowserProfile(
+                headless=False,
+                record_video_dir=str(output_dir),
+                record_video_size={"width": 1920, "height": 1080},
+                wait_between_actions=1.5,
+                minimum_wait_page_load_time=1.0,
+            )
 
         llm = get_llm(model)
 
-        # ground_truth = all task descriptions — the judge compares the
-        # final browser state against this to produce a pass/fail verdict.
         ground_truth = "\n".join(
             f"[{t['id']}]: {t['description'].strip()}" for t in tasks
         )
-
-        # Derive start URL — first route from task descriptions, or base_url fallback
-        import re as _re
-        steps_text = "\n".join(t['description'] for t in tasks)
-        first_route = _re.search(r"Navigate to (/\S+)", steps_text)
-        start_url = f"{base_url}{first_route.group(1)}" if first_route else base_url
 
         agent = Agent(
             task=prompt,
@@ -258,17 +287,25 @@ async def run_tasks(
             ground_truth=ground_truth,
         )
 
-        # agent.run() auto-closes the browser session internally (await self.close() in its own finally block)
+        # ── Start screen recording right before the agent runs ──
+        video_path = output_dir / "recording.mp4"
+        if use_xvfb:
+            ffmpeg_proc = start_screen_recording(video_path, ":99", "1920x1080", 25)
+            time.sleep(0.5)  # let ffmpeg initialize
+
+        # ── Run the agent ──
         history = await agent.run(max_steps=max_steps)
 
-        # Wait for video to finalize - ffmpeg needs time to write moov atom
-        # Longer delay in headless/container mode as video encoding can be slower
+        # ── Small delay so the final frame is captured ──
         import asyncio
-        finalize_delay = 5 if headless else 3
-        print(f"  Waiting {finalize_delay}s for video to finalize...")
-        await asyncio.sleep(finalize_delay)
+        await asyncio.sleep(2)
 
-        # Extract judge verdict — judgement() returns verdict as bool (True=pass) or string
+        # ── Stop screen recording ──
+        if ffmpeg_proc:
+            stop_screen_recording(ffmpeg_proc)
+            ffmpeg_proc = None
+
+        # ── Extract judge verdict ──
         judgement = history.judgement() if hasattr(history, 'judgement') else None
         if judgement:
             raw = judgement.get('verdict')
@@ -287,11 +324,10 @@ async def run_tasks(
         verdict_icon = "✅" if verdict == "pass" else "❌"
         print(f"{verdict_icon} Judge verdict: {verdict.upper()} — {str(verdict_reasoning)[:120]}")
 
-        # Find recorded video (skip trimming - it can corrupt videos)
+        # ── Find and validate video ──
         video_files = list(output_dir.glob("*.mp4")) + list(output_dir.glob("*.webm"))
         final_video_path: Path | None = None
         for video_file in video_files:
-            # Validate video has proper moov atom (ffprobe will fail if corrupt)
             try:
                 probe_result = subprocess.run(
                     ["ffprobe", "-v", "error", "-show_entries", "format=duration", str(video_file)],
@@ -300,38 +336,23 @@ async def run_tasks(
                     timeout=10,
                 )
                 if probe_result.returncode == 0 and "duration" in probe_result.stdout:
-                    # Also check frame count to detect dropped frames
-                    frame_check = subprocess.run(
-                        ["ffprobe", "-v", "error", "-select_streams", "v:0",
-                         "-count_packets", "-show_entries", "stream=nb_read_packets",
-                         "-of", "csv=p=0", str(video_file)],
-                        capture_output=True, text=True, timeout=30,
-                    )
-                    frame_count = int(frame_check.stdout.strip()) if frame_check.stdout.strip().isdigit() else 0
-                    duration_match = re.search(r"duration=(\d+\.?\d*)", probe_result.stdout)
-                    duration = float(duration_match.group(1)) if duration_match else 0
-                    expected_fps = 25  # typical browser recording fps
-                    expected_frames = duration * expected_fps * 0.5  # allow 50% frame drop threshold
-
-                    if frame_count < expected_frames and duration > 2:
-                        print(f"  ⚠️ Low frame count: {frame_count} frames for {duration:.1f}s video (expected ~{int(duration * expected_fps)})")
-
                     final_video_path = video_file
                     file_size = video_file.stat().st_size
-                    print(f"  ✅ Valid video: {video_file.name} ({file_size / 1024:.1f} KB, {frame_count} frames)")
+                    duration_match = re.search(r"duration=(\d+\.?\d*)", probe_result.stdout)
+                    duration = float(duration_match.group(1)) if duration_match else 0
+                    print(f"  ✅ Valid video: {video_file.name} ({file_size / 1024:.1f} KB, {duration:.1f}s)")
                 else:
-                    print(f"  ⚠️ Corrupt video (no moov atom): {video_file.name}")
+                    print(f"  ⚠️ Corrupt video: {video_file.name}")
             except (subprocess.TimeoutExpired, FileNotFoundError):
-                # ffprobe not available or timeout - use file anyway
                 final_video_path = video_file
 
-        # Upload to Convex if URL provided
+        # ── Upload to Convex ──
         video_url: str | None = None
         if convex_url and final_video_path and final_video_path.exists():
             print(f"  Uploading to Convex...")
             video_url = await upload_to_convex(convex_url, final_video_path)
 
-        # Write summary
+        # ── Write summary ──
         summary_path = output_dir / "summary.md"
         task_list = "\n".join(
             f"- **[{t['id']}]** {t['description']}" for t in tasks
@@ -368,3 +389,10 @@ async def run_tasks(
             success=False,
             error=str(exc),
         )
+
+    finally:
+        # Always clean up processes
+        if ffmpeg_proc:
+            stop_screen_recording(ffmpeg_proc)
+        if xvfb_proc:
+            stop_xvfb(xvfb_proc)
