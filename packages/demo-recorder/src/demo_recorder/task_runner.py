@@ -1,0 +1,251 @@
+"""
+task_runner.py — converts a tasks[] array into a single browser-agent session.
+
+Each task in the array becomes a numbered step in one combined prompt.
+The browser agent executes all steps sequentially in one session → one video.
+
+Task IDs act as labeled checkpoints in the recording timeline, not separate runs.
+
+Input shape (from upstream agent like Claude Code):
+    tasks = [
+        {"id": "auth-1", "description": "..."},
+        {"id": "auth-2", "description": "..."},
+    ]
+"""
+
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from datetime import datetime
+
+from browser_use import Agent, Browser
+
+from .recorder import get_llm
+
+
+def trim_black_opening(video_path: Path) -> Path:
+    """
+    Use ffmpeg blackdetect to find where real content starts and trim the
+    about:blank / black opening frames from the recording.
+
+    Returns the trimmed video path (replaces original in-place).
+    Falls back and returns original path if ffmpeg is not available.
+    """
+    try:
+        # Run blackdetect to find black intervals
+        result = subprocess.run(
+            [
+                "ffmpeg", "-i", str(video_path),
+                "-vf", "blackdetect=d=0.3:pix_th=0.15",
+                "-an", "-f", "null", "/dev/null",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        # Parse black_end times from stderr output
+        black_ends = re.findall(
+            r"black_end:(\d+\.?\d*)",
+            result.stderr,
+        )
+        if not black_ends:
+            return video_path  # no black opening detected
+
+        trim_start = float(black_ends[0])  # end of first black segment
+        if trim_start < 0.5:
+            return video_path  # too short to bother trimming
+
+        trimmed_path = video_path.with_name("recording.mp4")
+        subprocess.run(
+            [
+                "ffmpeg", "-i", str(video_path),
+                "-ss", str(trim_start),
+                "-c", "copy",
+                str(trimmed_path),
+                "-y",
+            ],
+            check=True,
+            capture_output=True,
+        )
+        video_path.unlink()  # remove the un-trimmed original
+        print(f"  Trimmed {trim_start:.1f}s of blank opening → {trimmed_path.name}")
+        return trimmed_path
+
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # ffmpeg not installed or failed — return original untouched
+        return video_path
+
+
+@dataclass
+class TasksResult:
+    tasks: list[dict]
+    prompt: str
+    output_path: Path
+    success: bool
+    verdict: str | None = None       # "pass" / "fail" / None if unknown
+    verdict_reasoning: str | None = None
+    error: str | None = None
+
+
+def build_prompt(tasks: list[dict], base_url: str) -> str:
+    """
+    Merge all task descriptions into one numbered browser-agent instruction string.
+
+    Each task's `id` becomes a labeled step marker so it maps to a point in
+    the recorded video timeline. All steps run in a single browser session.
+    """
+    steps = "\n".join(
+        f"  Step {i + 1} [{task['id']}]: {task['description'].strip()}"
+        for i, task in enumerate(tasks)
+    )
+
+    return (
+        f"Complete the following verification steps in order:\n\n"
+        f"{steps}\n\n"
+        f"Recording instructions (important):\n"
+        f"- Complete ALL steps in sequence — do not skip any.\n"
+        f"- Wait 1-2 seconds between each action so interactions are clearly visible.\n"
+        f"- After filling a field, pause briefly before clicking submit.\n"
+        f"- After each step completes, pause 2 seconds before starting the next step.\n"
+        f"- Do not close the browser when done."
+    )
+
+
+async def run_tasks(
+    tasks: list[dict],
+    base_url: str = "http://localhost:3000",
+    output_dir: str | Path | None = None,
+    model: str = "browser-use",
+    max_steps: int | None = None,
+) -> TasksResult:
+    """
+    Run all tasks as one browser agent session, recording a single video.
+
+    Args:
+        tasks:      List of {"id": str, "description": str} dicts.
+        base_url:   Base URL of the running app.
+        output_dir: Where to save the video and summary. Defaults to demos/<timestamp>/.
+        model:      LLM model (e.g. "browser-use", "gpt-4o", "claude-3-5-sonnet-latest").
+        max_steps:  Max agent steps. Defaults to len(tasks) * 8.
+
+    Returns:
+        TasksResult with the output path and success flag.
+    """
+    # Resolve output directory
+    if output_dir is None:
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        cwd = Path.cwd()
+        repo_root = cwd
+        for parent in [cwd, *cwd.parents]:
+            if (parent / "turbo.json").exists() or (parent / ".git").exists():
+                repo_root = parent
+                break
+        output_dir = repo_root / "demos" / timestamp
+    else:
+        output_dir = Path(output_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Scale max_steps with number of tasks if not overridden
+    if max_steps is None:
+        max_steps = len(tasks) * 8
+
+    # Build one combined prompt from all tasks
+    prompt = build_prompt(tasks, base_url)
+
+    print(f"Running {len(tasks)} task(s) in one session → {output_dir}")
+    print(f"\nPrompt preview:\n{'-' * 60}")
+    print(prompt)
+    print("-" * 60 + "\n")
+
+    try:
+        browser_session = Browser(
+            headless=False,
+            record_video_dir=str(output_dir),
+        )
+
+        llm = get_llm(model)
+
+        # ground_truth = all task descriptions — the judge compares the
+        # final browser state against this to produce a pass/fail verdict.
+        ground_truth = "\n".join(
+            f"[{t['id']}]: {t['description'].strip()}" for t in tasks
+        )
+
+        # Derive start URL — first route from task descriptions, or base_url fallback
+        import re as _re
+        steps_text = "\n".join(t['description'] for t in tasks)
+        first_route = _re.search(r"Navigate to (/\S+)", steps_text)
+        start_url = f"{base_url}{first_route.group(1)}" if first_route else base_url
+
+        agent = Agent(
+            task=prompt,
+            llm=llm,
+            browser=browser_session,
+            ground_truth=ground_truth,
+            # Explicit initial navigation — bypasses directly_open_url regex
+            # (which silently bails when >1 unique URL is found in the prompt)
+            initial_actions=[{"navigate": {"url": start_url, "new_tab": False}}],
+        )
+
+        # agent.run() auto-closes the browser session internally (await self.close() in its own finally block)
+        history = await agent.run(max_steps=max_steps)
+
+        # Extract judge verdict — judgement() returns verdict as bool (True=pass) or string
+        judgement = history.judgement() if hasattr(history, 'judgement') else None
+        if judgement:
+            raw = judgement.get('verdict')
+            if isinstance(raw, bool):
+                verdict = 'pass' if raw else 'fail'
+            elif isinstance(raw, str):
+                verdict = raw.lower()
+            else:
+                verdict = 'pass' if history.is_done() else 'fail'
+            verdict_reasoning = (
+                judgement.get('reasoning') or judgement.get('failure_reason') or history.final_result() or ''
+            )
+        else:
+            verdict = 'pass' if history.is_done() else 'fail'
+            verdict_reasoning = history.final_result() or ''
+        verdict_icon = "✅" if verdict == "pass" else "❌"
+        print(f"{verdict_icon} Judge verdict: {verdict.upper()} — {str(verdict_reasoning)[:120]}")
+
+        # Trim about:blank / black opening from the recorded video
+        video_files = list(output_dir.glob("*.mp4")) + list(output_dir.glob("*.webm"))
+        for video_file in video_files:
+            trim_black_opening(video_file)
+
+        # Write summary
+        summary_path = output_dir / "summary.md"
+        task_list = "\n".join(
+            f"- **[{t['id']}]** {t['description']}" for t in tasks
+        )
+        summary_path.write_text(
+            f"# Demo Recording — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            f"## Verdict: {verdict_icon} {verdict.upper()}\n"
+            f"{verdict_reasoning}\n\n"
+            f"## Tasks ({len(tasks)} steps)\n{task_list}\n\n"
+            f"## Full Prompt\n```\n{prompt}\n```\n\n"
+            f"## Output\n- Video: see `recording.mp4` in this directory\n\n"
+            f"---\n*Recorded with demo-recorder task_runner*\n"
+        )
+
+        print(f"✓ Recording complete → {output_dir}")
+        return TasksResult(
+            tasks=tasks,
+            prompt=prompt,
+            output_path=output_dir,
+            success=True,
+            verdict=verdict,
+            verdict_reasoning=verdict_reasoning,
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        print(f"✗ Recording failed: {exc}")
+        return TasksResult(
+            tasks=tasks,
+            prompt=prompt,
+            output_path=output_dir,
+            success=False,
+            error=str(exc),
+        )
