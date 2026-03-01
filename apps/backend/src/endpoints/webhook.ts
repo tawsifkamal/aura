@@ -137,11 +137,14 @@ webhooks.post("/pr", async (c) => {
 
           // Step 7: Analysis complete
           if (analysis.has_ui_changes) {
+            const taskList = analysis.tasks
+              .map((t, i) => `${i + 1}. ${t.description}`)
+              .join("\n");
             await updateComment(
               `✅ Analysis complete.\n\n` +
               `**Base URL:** \`${analysis.base_url}\`\n\n` +
               `**Setup:**\n\`\`\`bash\n${analysis.setup.join("\n")}\n\`\`\`\n\n` +
-              `**Testing steps:**\n\`\`\`json\n${JSON.stringify(analysis.tasks, null, 2)}\n\`\`\``
+              `**Testing steps:**\n${taskList}`
             );
           } else {
             await updateComment("✅ Analysis complete. No UI changes detected — skipping video recording.");
