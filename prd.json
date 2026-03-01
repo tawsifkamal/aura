@@ -282,7 +282,7 @@
         "Delivery failures per channel are logged and surfaced in run metadata without blocking other channels"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": "Composio is the routing layer for non-email delivery. AgentMail (US-013) handles email specifically. Users should be able to receive videos wherever they work"
     },
     {
