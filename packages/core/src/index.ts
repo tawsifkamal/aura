@@ -86,3 +86,17 @@ export type {
   UploadResult,
   ConvexUploaderOptions,
 } from "./convex-uploader.js";
+
+export {
+  findExistingComment,
+  postOrUpdateComment,
+  updateCommentStatus,
+  buildCommentBody,
+  COMMENT_MARKER,
+} from "./pr-bot.js";
+export type {
+  RunStatus,
+  PRContext,
+  PRBotOptions,
+  CommentState,
+} from "./pr-bot.js";
