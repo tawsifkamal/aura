@@ -17,5 +17,9 @@ declare global {
     COOKIE_SECRET: string;
     CONVEX_URL: string;
     CONVEX_DEPLOY_KEY: string;
+    DAYTONA_API_KEY: string;
+    BROWSER_USE_API_KEY: string;
+    ANTHROPIC_API_KEY: string;
+    GROQ_API_KEY: string;
   }
 }

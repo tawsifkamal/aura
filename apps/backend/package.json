@@ -9,6 +9,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "@daytonaio/sdk": "^0.148.0",
     "blakejs": "^1.2.1",
     "chanfana": "^2.6.3",
     "hono": "^4.6.20",

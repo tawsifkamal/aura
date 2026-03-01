@@ -7,6 +7,45 @@ const headers = (token: string) => ({
   "X-GitHub-Api-Version": "2022-11-28",
 });
 
+export async function getPrDiff(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<string> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${prNumber}`,
+    {
+      headers: {
+        ...headers(token),
+        Accept: "application/vnd.github.v3.diff",
+      },
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get PR diff: ${res.status} ${text}`);
+  }
+  const diff = await res.text();
+
+  // Filter out lock files to keep the diff small
+  const lines = diff.split("\n");
+  const filtered: string[] = [];
+  let skip = false;
+  for (const line of lines) {
+    if (line.startsWith("diff --git")) {
+      skip =
+        line.includes("package-lock.json") ||
+        line.includes("yarn.lock") ||
+        line.includes("pnpm-lock");
+    }
+    if (!skip) {
+      filtered.push(line);
+    }
+  }
+  return filtered.join("\n");
+}
+
 export async function getBranchSha(
   token: string,
   owner: string,
@@ -137,6 +176,50 @@ export async function getRepoPublicKey(
   }
   const data = (await res.json()) as { key_id: string; key: string };
   return { key_id: data.key_id, key: data.key };
+}
+
+export async function createPrComment(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<{ id: number }> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${prNumber}/comments`,
+    {
+      method: "POST",
+      headers: { ...headers(token), "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to create PR comment: ${res.status} ${text}`);
+  }
+  const data = (await res.json()) as { id: number };
+  return { id: data.id };
+}
+
+export async function updatePrComment(
+  token: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+): Promise<void> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    {
+      method: "PATCH",
+      headers: { ...headers(token), "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update PR comment: ${res.status} ${text}`);
+  }
 }
 
 export async function setRepoSecret(
