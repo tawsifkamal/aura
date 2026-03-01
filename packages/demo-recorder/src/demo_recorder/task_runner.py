@@ -259,6 +259,11 @@ async def run_tasks(
         # agent.run() auto-closes the browser session internally (await self.close() in its own finally block)
         history = await agent.run(max_steps=max_steps)
 
+        # Wait for video to finalize - ffmpeg needs time to write moov atom
+        import asyncio
+        print("  Waiting for video to finalize...")
+        await asyncio.sleep(3)
+
         # Extract judge verdict — judgement() returns verdict as bool (True=pass) or string
         judgement = history.judgement() if hasattr(history, 'judgement') else None
         if judgement:
@@ -282,7 +287,23 @@ async def run_tasks(
         video_files = list(output_dir.glob("*.mp4")) + list(output_dir.glob("*.webm"))
         final_video_path: Path | None = None
         for video_file in video_files:
-            final_video_path = video_file
+            # Validate video has proper moov atom (ffprobe will fail if corrupt)
+            try:
+                probe_result = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration", str(video_file)],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if probe_result.returncode == 0 and "duration" in probe_result.stdout:
+                    final_video_path = video_file
+                    file_size = video_file.stat().st_size
+                    print(f"  ✅ Valid video: {video_file.name} ({file_size / 1024:.1f} KB)")
+                else:
+                    print(f"  ⚠️ Corrupt video (no moov atom): {video_file.name}")
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                # ffprobe not available or timeout - use file anyway
+                final_video_path = video_file
 
         # Upload to Convex if URL provided
         video_url: str | None = None

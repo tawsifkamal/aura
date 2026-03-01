@@ -17,7 +17,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN npm install -g @anthropic-ai/claude-code
 
 # Cache-bust: change this value to force re-pull from GitHub
-ARG CACHE_BUST=20260301021012
+ARG CACHE_BUST=20260301023205
 
 # Install demo-recorder from GitHub + browser-use video support
 RUN pip install --no-cache-dir "git+https://github.com/tawsifkamal/aura.git#subdirectory=packages/demo-recorder" && \
