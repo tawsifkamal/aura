@@ -299,7 +299,7 @@
         "Users can request multiple rounds of edits in a conversational thread"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": "This is the conversational counterpart to the dashboard GUI editor (US-014). Both use the same backend editing API. The NLP parsing layer translates free-text prompts into structured edit operations"
     },
     {
