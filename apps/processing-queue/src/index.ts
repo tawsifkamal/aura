@@ -263,6 +263,243 @@ async function recordVideo(
   return { verdict, reasoning, videoPath, outputDir, events };
 }
 
+// ── Video post-processing (zoom, cursor, freeze removal) ──────────
+
+const CURSOR_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAEw0lE" +
+  "QVRoge2Zb0jUdxzH33qr0zs5yzyDTKjMJVoShj1xUUNmBwXNgZIEOyTt4ByZqXeeCvs9FMbEHo" +
+  "TEcjQWPd6ae5DBwkdCBMH2IPpjBQPnIcORnnrLu9ceyN201K5uu1+CL7gnPz735fW+3+/4fr6fn" +
+  "7TBBhtssBYlJSWh4uLi2a6urjKzXZIFSezatetvv9//kdkyyUDss3379khbW9tnZgu9K0ji+PHj" +
+  "SGLbtm3R9vb2BrOl3gUkEQ6HqaurQxJ2u53m5ma/2WJvC5IAWFhYoKmpCUlYrVY8Hs9XZsu9Df" +
+  "EgANFolI6ODiRhsVhoaGj41mzBRFkWJEZvby+SSEtL48yZMz+aLZkIKwYBGBgYID09HUnU1NSM" +
+  "mi36JlYNAnDjxg02bdqEJE6cOPGrYRgfmC28GmsGARgaGiIzMxNJVFVVPTMMI8Ns6ZV4YxCAkZ" +
+  "ERHBx4HkqisrJwwDCPHbPFXSSgIwL1793A6nUji0KFDU93d3flmyy8l4SAADx48oKCgAEmUlpbO" +
+  "BAKBD80OEOOtggA8f/6coqIiJFFYWDjf2dlZYXYI6R2CAExMTHDw4EEksXPnzpc+n++TdRkEYGpq" +
+  "isrKSiThdDojFy9erF2XQQBCoRAulwtJZGdnR1taWjzrMghAOBymtrZ2aefctS6DwGLn3NjYiCQ2" +
+  "b97MuXPn+tZlEFjsnNvb25d2zt+tyyAxlnbO9fX1Q+sqSCgU4unTp4yOjnLz5k2OHDkSnwXU1d" +
+  "X9kqhMWpJBBCRU/OjRI/X19Wl8fFyTk5MKBoMKBoOanZ1d9TtZWVnMzMykJ7J+ylrra9eu6cqV" +
+  "K69dt1qtysnJieTk5ISzs7NDNpvthd1un7Lb7X/k5eX90N/f/7+7rfloXb16lZMnTzI5OQnA/f" +
+  "v3SUtLw2Kx4PV6v+zo6Kh+X5rHVYPE/rSS6O7ujl+vrq5GEvX19T+bq76c14JEo1F8Ph+S4kdd" +
+  "p9PJ3NwcALdv344N9BYMw8gyV/9fXpuinD9/ftnGVlpaOiOJwcHBeF15eTmSaGhoGDRX/1+WzbXc" +
+  "bjeSsNlsNDc390jS2bNnv5HE/v37iUajwOJZXottfPh9Occjifn5eWpqapCEw+GItrS0eGMFhmE4" +
+  "8vLyIpK4c+dOPHRhYSGS8Hq9hknuy0ASx44dQxK5ublRv9//+atFtbW1I1ocC8Ufr0uXLiGJ8v" +
+  "LyqVRLr8Sr0/hPVyoKBAIlVquV9PR0xsbG4rt5bm4ukrhw4UJjSq1XAEkUFBS89Pl8H69VWFVV" +
+  "9UwSbW1t8bvS09ODJI4ePfp7SmxX4/Dhw3+WlZVNJ/LGqrW11S2JLVu2MD09DUAwGCQjIwOLxc" +
+  "KbfojEqapqalfEkVFRUQiEQDGxsawWCzYbDYCgUBxMusn1Fn+F+Tn53fu2LEj8vjxYw0PD0uS9u" +
+  "zZo1OnTml2dlZPnjwZSJVL0pw+fXpYEi6XC1g8s3d2dsZe3UWSmQ2ndGfdvXv3F5mZmQ9v3bolv9" +
+  "+v69eva3x8XJK0devWl6l0SRqXy/VQS/agffv2zbnd7u8Nw3Aks27Ke50DBw603r1796e9e/f+VV" +
+  "FR8bXT6ew1DCOaao8NNkiQfwAwTKa+WWZZxwAAAABJRU5ErkJggg==";
+
+function generatePostprocessScript(): string {
+  return `
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { readFile, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+const execFileAsync = promisify(execFile);
+
+const [,, inputPath, outputPath, eventsPath, cursorPath, widthStr, heightStr] = process.argv;
+const width = parseInt(widthStr); const height = parseInt(heightStr);
+const events = JSON.parse(await readFile(eventsPath, "utf8"));
+const clicks = events.filter(e => e.type === "click");
+
+if (clicks.length === 0) {
+  console.log("No click events, skipping zoom/cursor. Running freeze removal only.");
+  const freezes = await detectFreezes(inputPath);
+  if (freezes.length > 0) { await removeFreezes(inputPath, outputPath, freezes); }
+  else { await execFileAsync("ffmpeg", ["-y", "-i", inputPath, "-c", "copy", outputPath]); }
+  process.exit(0);
+}
+
+// ── Zoom (0.4s ease-out in, 1.5s hold, 0.4s ease-in out) ──
+function buildZoomFilter(evts) {
+  const scale = 0.35, animDur = 0.4, holdDur = 1.5;
+  const pulses = evts.filter(e => e.type === "click").map(ev => {
+    const t0 = ev.atMs / 1000, inStart = t0 - 1.0, inEnd = inStart + animDur;
+    const holdEnd = inEnd + holdDur, outEnd = holdEnd + animDur;
+    const pIn = "((t-" + inStart + ")/" + animDur + ")";
+    const pOut = "((t-" + holdEnd + ")/" + animDur + ")";
+    return "if(between(t," + inStart + "," + inEnd + "),1+" + scale + "*(2*" + pIn + "-" + pIn + "*" + pIn + ")," +
+      "if(between(t," + inEnd + "," + holdEnd + ")," + (1 + scale) + "," +
+      "if(between(t," + holdEnd + "," + outEnd + "),1+" + scale + "*(1-" + pOut + "*" + pOut + "),1)))";
+  });
+  const parts = ["1", ...pulses];
+  return parts.length === 1 ? "1" : parts.reduce((a, b) => "max(" + a + "," + b + ")");
+}
+
+function buildFocusExpr(evts, axis, fallback) {
+  const ordered = [...evts].sort((a, b) => a.atMs - b.atMs);
+  if (!ordered.length) return String(fallback);
+  let expr = String(fallback);
+  for (const ev of ordered) {
+    const t = Math.max(0, ev.atMs / 1000 - 1.0);
+    expr = "if(gte(t," + t + ")," + (axis === "x" ? ev.x : ev.y) + "," + expr + ")";
+  }
+  return expr;
+}
+
+function buildCursorPosExpr(evts, axis, w, h) {
+  const cl = evts.filter(e => e.type === "click").sort((a, b) => a.atMs - b.atMs);
+  if (!cl.length) return axis === "x" ? String(w / 2) : String(h / 2);
+  const moveDur = 0.4, center = axis === "x" ? w / 2 : h / 2;
+  const kfs = cl.map((c, i) => {
+    const coord = axis === "x" ? c.x : c.y;
+    const moveEnd = c.atMs / 1000 - 1.05, moveStart = moveEnd - moveDur;
+    const prev = i === 0 ? center : (axis === "x" ? cl[i-1].x : cl[i-1].y);
+    return { moveStart, moveEnd, from: prev, to: coord };
+  });
+  let expr = String(kfs[kfs.length - 1].to);
+  for (let i = kfs.length - 1; i >= 0; i--) {
+    const k = kfs[i], p = "((t-" + k.moveStart + ")/" + moveDur + ")";
+    const eased = "(2*" + p + "-" + p + "*" + p + ")";
+    const lerp = "(" + k.from + "+(" + k.to + "-" + k.from + ")*" + eased + ")";
+    expr = "if(lt(t," + k.moveStart + ")," + k.from + ",if(lt(t," + k.moveEnd + ")," + lerp + "," + expr + "))";
+  }
+  return expr;
+}
+
+function buildCursorScaleExpr(evts, base) {
+  let expr = String(base);
+  for (const c of evts.filter(e => e.type === "click")) {
+    const T = c.atMs / 1000, se = T + 0.08, ee = se + 0.15;
+    const ps = "((t-" + T + ")/0.08)", pe = "((t-" + se + ")/0.15)";
+    expr = "if(between(t," + T + "," + se + ")," + base + "*(1-0.5*" + ps + ")," +
+      "if(between(t," + se + "," + ee + ")," + base + "*(0.5+0.5*" + pe + ")," + expr + "))";
+  }
+  return expr;
+}
+
+function buildCursorOutExpr(cursorExpr, focusExpr, zoomExpr, dim) {
+  const fz = "(" + focusExpr + ")*(" + zoomExpr + ")";
+  const maxCrop = dim + "*((" + zoomExpr + ")-1)";
+  const crop = "max(0,min(" + maxCrop + "," + fz + "-" + dim + "/2))";
+  return "((" + cursorExpr + ")*(" + zoomExpr + ")-" + crop + ")";
+}
+
+// ── Step 1: Zoom + cursor ──
+console.log("Postprocess step 1: zoom + cursor overlay...");
+const zoomExpr = buildZoomFilter(events);
+const fxExpr = buildFocusExpr(events, "x", width / 2);
+const fyExpr = buildFocusExpr(events, "y", height / 2);
+const maxCX = width + "*((" + zoomExpr + ")-1)";
+const maxCY = height + "*((" + zoomExpr + ")-1)";
+const cropX = "max(0,min(" + maxCX + ",(" + fxExpr + ")*(" + zoomExpr + ")-" + width + "/2))";
+const cropY = "max(0,min(" + maxCY + ",(" + fyExpr + ")*(" + zoomExpr + ")-" + height + "/2))";
+const curOX = buildCursorOutExpr(buildCursorPosExpr(events, "x", width, height), fxExpr, zoomExpr, width);
+const curOY = buildCursorOutExpr(buildCursorPosExpr(events, "y", width, height), fyExpr, zoomExpr, height);
+const scaleExpr = buildCursorScaleExpr(events, 32);
+const firstT = Math.max(0, Math.min(...clicks.map(e => e.atMs / 1000)) - 0.5);
+const fc =
+  "[0:v]scale=w='iw*(" + zoomExpr + ")':h='ih*(" + zoomExpr + ")':eval=frame," +
+  "crop=" + width + ":" + height + ":x='" + cropX + "':y='" + cropY + "'[processed];" +
+  "[1:v]scale=w='" + scaleExpr + "':h='" + scaleExpr + "':eval=frame[cursor];" +
+  "[processed][cursor]overlay=x='" + curOX + "-2':y='" + curOY + "-1':" +
+  "enable='gte(t," + firstT + ")':shortest=1:format=auto,format=yuv420p[final]";
+const temp = await mkdtemp(join(tmpdir(), "aura-pp-"));
+const filterFile = join(temp, "fc.txt");
+await writeFile(filterFile, fc, "utf8");
+const zoomedPath = inputPath.replace(/\\.mp4$/, "_zoomed.mp4");
+try {
+  await execFileAsync("ffmpeg", [
+    "-y", "-i", inputPath, "-loop", "1", "-i", cursorPath,
+    "-filter_complex_script", filterFile,
+    "-map", "[final]", "-map", "0:a?",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+    "-pix_fmt", "yuv420p", "-movflags", "+faststart", zoomedPath,
+  ], { maxBuffer: 10 * 1024 * 1024 });
+} finally { await rm(temp, { recursive: true, force: true }); }
+console.log("  Zoom + cursor done");
+
+// ── Step 2: Freeze detection ──
+console.log("Postprocess step 2: freeze detection...");
+const freezes = await detectFreezes(zoomedPath);
+console.log("  " + freezes.length + " freeze(s)");
+
+// ── Step 3: Freeze removal ──
+console.log("Postprocess step 3: freeze removal...");
+if (freezes.length > 0) { await removeFreezes(zoomedPath, outputPath, freezes); }
+else { await execFileAsync("ffmpeg", ["-y", "-i", zoomedPath, "-c", "copy", outputPath]); }
+// Clean up intermediate
+await rm(zoomedPath, { force: true });
+console.log("Done -> " + outputPath);
+
+async function detectFreezes(vp, thresh = 1.5) {
+  const { stderr } = await execFileAsync("ffmpeg", [
+    "-i", vp, "-vf", "freezedetect=n=0.003:d=" + thresh, "-f", "null", "-",
+  ], { maxBuffer: 50 * 1024 * 1024 });
+  const ff = []; let cs = null;
+  for (const l of stderr.split("\\n")) {
+    const sm = l.match(/freeze_start:\\s*([\\d.]+)/);
+    if (sm) cs = parseFloat(sm[1]);
+    const em = l.match(/freeze_end:\\s*([\\d.]+)/);
+    if (em && cs !== null) { ff.push({ start: cs, end: parseFloat(em[1]) }); cs = null; }
+  }
+  return ff;
+}
+
+async function removeFreezes(inp, out, ff, keep = 1.5) {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v", "error", "-show_entries", "format=duration", "-of", "json", inp,
+  ]);
+  const total = parseFloat(JSON.parse(stdout).format.duration);
+  const cuts = ff.filter(f => (f.end - f.start) > keep).map(f => ({ start: f.start + keep, end: f.end }));
+  if (!cuts.length) { await execFileAsync("ffmpeg", ["-y", "-i", inp, "-c", "copy", out]); return; }
+  const segs = []; let cur = 0;
+  for (const c of cuts) { if (c.start > cur) segs.push({ start: cur, end: c.start }); cur = c.end; }
+  if (cur < total) segs.push({ start: cur, end: total });
+  const sel = segs.map(s => "between(t," + s.start + "," + s.end + ")").join("+");
+  await execFileAsync("ffmpeg", [
+    "-y", "-i", inp, "-vf", "select='" + sel + "',setpts=N/FRAME_RATE/TB",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+    "-pix_fmt", "yuv420p", "-movflags", "+faststart", out,
+  ], { maxBuffer: 10 * 1024 * 1024 });
+  const { stdout: nd } = await execFileAsync("ffprobe", [
+    "-v", "error", "-show_entries", "format=duration", "-of", "json", out,
+  ]);
+  const newDur = parseFloat(JSON.parse(nd).format.duration);
+  console.log("  " + total.toFixed(1) + "s -> " + newDur.toFixed(1) + "s");
+}
+`.trim();
+}
+
+async function postprocessVideo(
+  sandbox: Sandbox,
+  videoPath: string,
+  events: InteractionEvent[],
+  width = 1920,
+  height = 1080,
+): Promise<string> {
+  const outputPath = videoPath.replace(/\.mp4$/, "_final.mp4");
+
+  // Write cursor PNG
+  await sandbox.process.executeCommand(
+    `echo '${CURSOR_PNG_BASE64}' | base64 -d > /tmp/aura_cursor.png`,
+  );
+
+  // Write events JSON
+  const eventsB64 = Buffer.from(JSON.stringify(events)).toString("base64");
+  await sandbox.process.executeCommand(
+    `echo '${eventsB64}' | base64 -d > /tmp/aura_events.json`,
+  );
+
+  // Write postprocess script
+  const scriptB64 = Buffer.from(generatePostprocessScript()).toString("base64");
+  await sandbox.process.executeCommand(
+    `echo '${scriptB64}' | base64 -d > /tmp/aura_postprocess.mjs`,
+  );
+
+  // Execute postprocess
+  const result = await sandbox.process.executeCommand(
+    `node /tmp/aura_postprocess.mjs "${videoPath}" "${outputPath}" /tmp/aura_events.json /tmp/aura_cursor.png ${width} ${height}`,
+    undefined, undefined, 180,
+  );
+
+  console.log(`[postprocess] output: ${result.result}`);
+
+  return outputPath;
+}
+
 async function uploadVideoFromSandbox(sandbox: Sandbox, videoPath: string, uploadUrl: string): Promise<string> {
   const contentType = videoPath.endsWith(".webm") ? "video/webm" : "video/mp4";
 
@@ -379,11 +616,29 @@ async function runPipeline(msg: PrPipelineMessage, env: Env): Promise<void> {
           (recording.reasoning ? `\n> ${recording.reasoning}` : ""),
         );
 
+        // Step 10.5: Post-process video (zoom, cursor, freeze removal)
+        let finalVideoPath = recording.videoPath;
+        if (recording.events.length > 0) {
+          log("step 10.5", `post-processing video with ${recording.events.length} event(s)`);
+          await updateComment("✨ Post-processing video (zoom effects, cursor overlay)...");
+          try {
+            finalVideoPath = await postprocessVideo(sandbox, recording.videoPath, recording.events);
+            log("step 10.5", `post-processing done: ${finalVideoPath}`);
+          } catch (ppErr) {
+            const ppMsg = ppErr instanceof Error ? ppErr.message : String(ppErr);
+            log("step 10.5", `post-processing failed, using raw video: ${ppMsg}`);
+            await updateComment("⚠️ Post-processing failed, using raw recording.");
+            finalVideoPath = recording.videoPath;
+          }
+        } else {
+          log("step 10.5", "no interaction events, skipping post-processing");
+        }
+
         // Step 11: Upload video to Convex
         log("step 11", "uploading video");
         await updateComment("⬆️ Uploading video...");
         const uploadUrl = await convex.mutation<string>("runs:generateUploadUrl");
-        const storageId = await uploadVideoFromSandbox(sandbox, recording.videoPath, uploadUrl);
+        const storageId = await uploadVideoFromSandbox(sandbox, finalVideoPath, uploadUrl);
         log("step 11", `uploaded, storageId=${storageId}`);
 
         // Step 12: Get signed URL and embed in comment
