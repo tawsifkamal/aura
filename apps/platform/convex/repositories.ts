@@ -120,6 +120,44 @@ export const get = query({
   },
 });
 
+// Look up a repo by user ID and GitHub repo ID
+export const getByUserAndGithubId = query({
+  args: {
+    userId: v.id("users"),
+    githubRepoId: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("repositories")
+      .withIndex("by_user_and_github_id", (q) =>
+        q.eq("userId", args.userId).eq("githubRepoId", args.githubRepoId),
+      )
+      .unique();
+  },
+});
+
+// Update setup status (called by backend after automated setup)
+export const updateSetupStatus = mutation({
+  args: {
+    id: v.id("repositories"),
+    setupStatus: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    setupPrUrl: v.optional(v.string()),
+    setupPrNumber: v.optional(v.number()),
+    setupError: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, unknown> = { setupStatus: args.setupStatus };
+    if (args.setupPrUrl !== undefined) patch.setupPrUrl = args.setupPrUrl;
+    if (args.setupPrNumber !== undefined) patch.setupPrNumber = args.setupPrNumber;
+    if (args.setupError !== undefined) patch.setupError = args.setupError;
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
 // Remove a repository (when user disables it)
 export const remove = mutation({
   args: { id: v.id("repositories") },

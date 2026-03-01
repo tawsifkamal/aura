@@ -1,8 +1,10 @@
 import { fromHono } from "chanfana";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { getCookie } from "hono/cookie";
 import { ALLOWED_ORIGINS } from "./types";
 import { ConvexClient } from "./convex";
+import { verifySession } from "./cookie";
 import { GitHubAuthRedirect } from "./endpoints/githubAuth";
 import { GitHubCallback } from "./endpoints/githubCallback";
 import { SessionInfo } from "./endpoints/sessionInfo";
@@ -109,6 +111,34 @@ app.post("/api/exports/:exportId/fail", async (c) => {
   });
 
   return c.json({ success: true, exportId, status: "failed" });
+});
+
+// API key endpoint — returns the user's API key
+app.get("/api/auth/api-key", async (c) => {
+  const raw = getCookie(c, "aura_session");
+  if (!raw) {
+    return c.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const session = await verifySession<{ github_user_id: number }>(
+    c.env.COOKIE_SECRET,
+    raw,
+  );
+  if (!session) {
+    return c.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const convex = c.get("convex");
+  const user = await convex.query<{ apiKey?: string } | null>(
+    "users:getByGithubId",
+    { githubUserId: session.github_user_id },
+  );
+
+  if (!user || !user.apiKey) {
+    return c.json({ error: "No API key found" }, { status: 404 });
+  }
+
+  return c.json({ apiKey: user.apiKey });
 });
 
 // Upload URL endpoint — generates Convex storage upload URL

@@ -6,13 +6,17 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listRuns,
   logout,
+  getApiKey,
   listEnabledRepositories,
   listRepositories,
   enableRepository,
   disableRepository,
+  setupRepository,
+  getSetupStatus,
   type RunListItem,
   type EnabledRepo,
   type Repository,
+  type SetupStatus,
 } from "../api-client";
 import { useApi } from "../hooks";
 import { useAuth } from "../auth-provider";
@@ -51,7 +55,7 @@ function formatTime(ts: number): string {
   });
 }
 
-function SetupModal({
+function ManualSetupModal({
   repo,
   onDone,
 }: {
@@ -74,7 +78,7 @@ function SetupModal({
       >
         <div className={styles.setupHeader}>
           <h3 className={styles.setupTitle}>
-            Set up Aura for {repo.full_name}
+            Manual setup for {repo.full_name}
           </h3>
           <button
             className={styles.searchClose}
@@ -94,7 +98,7 @@ function SetupModal({
               </p>
               <p className={styles.setupStepDesc}>
                 Create{" "}
-                <code>.github/workflows/aura.yml</code> in{" "}
+                <code>.github/workflows/aura-ci.yml</code> in{" "}
                 <strong>{repo.full_name}</strong> with the following content:
               </p>
             </div>
@@ -145,6 +149,169 @@ function SetupModal({
         >
           Done
         </button>
+      </div>
+    </div>
+  );
+}
+
+function SetupModal({
+  repo,
+  onDone,
+}: {
+  repo: Repository;
+  onDone: () => void;
+}) {
+  const [phase, setPhase] = useState<"confirm" | "running" | "done" | "error" | "manual">("confirm");
+  const [status, setStatus] = useState<SetupStatus | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  async function handleAutoSetup() {
+    setPhase("running");
+    try {
+      await setupRepository(repo.id);
+    } catch {
+      setPhase("error");
+      setStatus({
+        setupStatus: "failed",
+        setupPrUrl: null,
+        setupPrNumber: null,
+        setupError: "Failed to start setup. Please try again.",
+      });
+      return;
+    }
+
+    // Poll for status
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await getSetupStatus(repo.id);
+        setStatus(s);
+        if (s.setupStatus === "completed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPhase("done");
+        } else if (s.setupStatus === "failed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPhase("error");
+        }
+      } catch {
+        // Keep polling on network errors
+      }
+    }, 2000);
+  }
+
+  if (phase === "manual") {
+    return <ManualSetupModal repo={repo} onDone={onDone} />;
+  }
+
+  return (
+    <div className={styles.searchOverlay} onClick={onDone}>
+      <div
+        className={styles.setupModal}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.setupHeader}>
+          <h3 className={styles.setupTitle}>
+            Set up Aura for {repo.full_name}
+          </h3>
+          <button
+            className={styles.searchClose}
+            onClick={onDone}
+            type="button"
+          >
+            esc
+          </button>
+        </div>
+
+        <div className={styles.setupBody}>
+          {phase === "confirm" && (
+            <>
+              <p className={styles.setupDesc}>
+                Aura will create a pull request with the CI workflow and set your
+                API key as a repository secret on{" "}
+                <strong>{repo.full_name}</strong>.
+              </p>
+              <div className={styles.setupActions}>
+                <button
+                  className={styles.setupAutoButton}
+                  onClick={handleAutoSetup}
+                  type="button"
+                >
+                  Set up automatically
+                </button>
+                <button
+                  className={styles.setupSkipButton}
+                  onClick={() => setPhase("manual")}
+                  type="button"
+                >
+                  I'll do it manually
+                </button>
+              </div>
+            </>
+          )}
+
+          {phase === "running" && (
+            <div className={styles.setupRunning}>
+              <div className={styles.spinner} />
+              <p className={styles.setupRunningText}>
+                Setting up {repo.full_name}...
+              </p>
+              <p className={styles.setupRunningHint}>
+                Creating branch, workflow file, PR, and setting secret
+              </p>
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className={styles.setupResult}>
+              <p className={styles.setupResultTitle}>Setup complete</p>
+              {status?.setupPrUrl ? (
+                <p className={styles.setupResultDesc}>
+                  Pull request created:{" "}
+                  <a
+                    href={status.setupPrUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.setupResultLink}
+                  >
+                    #{status.setupPrNumber} — View on GitHub
+                  </a>
+                </p>
+              ) : (
+                <p className={styles.setupResultDesc}>
+                  Workflow already exists. API key secret has been set.
+                </p>
+              )}
+              <button
+                className={styles.setupDoneButton}
+                onClick={onDone}
+                type="button"
+              >
+                Done
+              </button>
+            </div>
+          )}
+
+          {phase === "error" && (
+            <div className={styles.setupResult}>
+              <p className={styles.setupErrorTitle}>Setup failed</p>
+              <p className={styles.setupErrorDesc}>
+                {status?.setupError ?? "An unknown error occurred."}
+              </p>
+              <button
+                className={styles.setupDoneButton}
+                onClick={onDone}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -268,6 +435,9 @@ export default function Dashboard() {
   const [showSearch, setShowSearch] = useState(false);
   const [setupRepo, setSetupRepo] = useState<Repository | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(true);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
 
   const loadEnabledRepos = useCallback(() => {
     setReposLoading(true);
@@ -280,6 +450,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!loading && session) {
       loadEnabledRepos();
+      setApiKeyLoading(true);
+      getApiKey()
+        .then((res) => setApiKey(res.apiKey))
+        .catch(() => setApiKey(null))
+        .finally(() => setApiKeyLoading(false));
     }
   }, [loading, session, loadEnabledRepos]);
 
@@ -347,6 +522,39 @@ export default function Dashboard() {
           Sign out
         </button>
       </header>
+
+      {/* API Key Section */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>API Key</h2>
+        </div>
+        {apiKeyLoading ? (
+          <p className={styles.sectionMuted}>loading...</p>
+        ) : apiKey ? (
+          <div className={styles.apiKeyRow}>
+            <code className={styles.apiKeyValue}>{apiKey}</code>
+            <button
+              className={styles.apiKeyCopy}
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(apiKey);
+                setApiKeyCopied(true);
+                setTimeout(() => setApiKeyCopied(false), 2000);
+              }}
+            >
+              {apiKeyCopied ? "copied" : "copy"}
+            </button>
+          </div>
+        ) : (
+          <p className={styles.sectionMuted}>
+            No API key found. Sign out and sign back in to generate one.
+          </p>
+        )}
+        <p className={styles.apiKeyHint}>
+          Add this as a repository secret named <code>AURA_API_KEY</code> in
+          your GitHub repo settings.
+        </p>
+      </section>
 
       {/* Repositories Section */}
       <section className={styles.section}>

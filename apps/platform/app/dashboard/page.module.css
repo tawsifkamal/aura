@@ -89,6 +89,59 @@
   background: var(--surface);
 }
 
+/* API key */
+
+.apiKeyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.apiKeyValue {
+  flex: 1;
+  font-size: 13px;
+  font-family: var(--font-geist-mono), monospace;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.apiKeyCopy {
+  font-size: 11px;
+  font-family: var(--font-geist-mono), monospace;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.apiKeyCopy:hover {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.apiKeyHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.apiKeyHint code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  padding: 1px 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
 /* Repo list */
 
 .repoList {
@@ -462,6 +515,136 @@
 
 .setupDoneButton:hover {
   background: var(--surface);
+}
+
+/* Setup automated flow */
+
+.setupBody {
+  padding: 24px 20px;
+}
+
+.setupDesc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--foreground);
+  margin-bottom: 24px;
+}
+
+.setupActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setupAutoButton {
+  font-size: 13px;
+  font-family: var(--font-geist-mono), monospace;
+  color: var(--foreground);
+  background: none;
+  border: 1px solid var(--foreground);
+  padding: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.setupAutoButton:hover {
+  background: var(--surface);
+}
+
+.setupSkipButton {
+  font-size: 12px;
+  font-family: var(--font-geist-mono), monospace;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.setupSkipButton:hover {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.setupRunning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+  gap: 14px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--foreground);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.setupRunningText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.setupRunningHint {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.setupResult {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setupResultTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.setupResultDesc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.setupResultLink {
+  color: var(--foreground);
+  text-decoration: underline;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.setupResultLink:hover {
+  opacity: 0.8;
+}
+
+.setupErrorTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e55;
+}
+
+.setupErrorDesc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-family: var(--font-geist-mono), monospace;
+  word-break: break-word;
 }
 
 /* Recordings grid */

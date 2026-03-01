@@ -41,6 +41,12 @@ export default defineSchema({
     ),
     addedAt: v.optional(v.number()),
     lastSyncedAt: v.optional(v.number()),
+    setupStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    ),
+    setupPrUrl: v.optional(v.string()),
+    setupPrNumber: v.optional(v.number()),
+    setupError: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_github_id", ["userId", "githubRepoId"])

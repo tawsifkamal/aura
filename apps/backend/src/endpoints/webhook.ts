@@ -30,12 +30,40 @@ webhooks.post("/pr", async (c) => {
   const body = await c.req.json<{
     repository_id: number;
     branch: string;
+    base_branch?: string;
     pr_number?: number;
     commit_sha?: string;
   }>();
 
+  // Verify the user has this repository enabled
+  const repo = await convex.query<{
+    _id: string;
+    status: string;
+    defaultBranch: string;
+  } | null>(
+    "repositories:getByUserAndGithubId",
+    { userId: user._id, githubRepoId: body.repository_id },
+  );
+
+  if (!repo || (repo.status !== "added" && repo.status !== "synced")) {
+    return c.json(
+      { error: "Repository not enabled for this API key" },
+      { status: 403 },
+    );
+  }
+
+  // Only process PRs targeting the default branch
+  if (body.base_branch && body.base_branch !== repo.defaultBranch) {
+    return c.json({
+      success: true,
+      message: "Skipped — PR does not target the default branch",
+      base_branch: body.base_branch,
+      default_branch: repo.defaultBranch,
+    });
+  }
+
   console.log(
-    `[webhook/pr] user=${user.githubLogin} repo=${body.repository_id} branch=${body.branch} pr=${body.pr_number ?? "none"} sha=${body.commit_sha ?? "none"}`,
+    `[webhook/pr] user=${user.githubLogin} repo=${body.repository_id} branch=${body.branch} base=${body.base_branch ?? repo.defaultBranch} pr=${body.pr_number ?? "none"} sha=${body.commit_sha ?? "none"}`,
   );
 
   return c.json({

@@ -4,7 +4,7 @@ import type { AppContext } from "../types";
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 
-const SCOPES = ["repo", "read:user", "user:email"].join(" ");
+const SCOPES = ["repo", "workflow", "read:user", "user:email"].join(" ");
 
 export class GitHubAuthRedirect extends OpenAPIRoute {
   schema = {

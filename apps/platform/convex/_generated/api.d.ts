@@ -10,6 +10,7 @@
 
 import type * as edits from "../edits.js";
 import type * as exports from "../exports.js";
+import type * as repositories from "../repositories.js";
 import type * as runs from "../runs.js";
 import type * as users from "../users.js";
 
@@ -22,6 +23,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   edits: typeof edits;
   exports: typeof exports;
+  repositories: typeof repositories;
   runs: typeof runs;
   users: typeof users;
 }>;

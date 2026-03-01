@@ -46,6 +46,10 @@ export function logout(): Promise<{ success: boolean }> {
   return apiFetch("/api/auth/logout", { method: "POST" });
 }
 
+export function getApiKey(): Promise<{ apiKey: string }> {
+  return apiFetch("/api/auth/api-key");
+}
+
 export function getGitHubAuthUrl(redirectTo?: string): string {
   const params = new URLSearchParams();
   if (redirectTo) params.set("redirect_to", redirectTo);
@@ -148,6 +152,17 @@ export interface EnabledRepo {
   status: "available" | "added" | "synced";
   addedAt?: number;
   lastSyncedAt?: number;
+  setupStatus?: "pending" | "completed" | "failed" | null;
+  setupPrUrl?: string | null;
+  setupPrNumber?: number | null;
+  setupError?: string | null;
+}
+
+export interface SetupStatus {
+  setupStatus: "pending" | "completed" | "failed" | null;
+  setupPrUrl: string | null;
+  setupPrNumber: number | null;
+  setupError: string | null;
 }
 
 export function listRepositories(q?: string): Promise<Repository[]> {
@@ -184,6 +199,18 @@ export function disableRepository(
   return apiFetch(`/api/repositories/${githubRepoId}/disable`, {
     method: "POST",
   });
+}
+
+export function setupRepository(
+  githubRepoId: number,
+): Promise<{ success: boolean }> {
+  return apiFetch(`/api/repositories/${githubRepoId}/setup`, {
+    method: "POST",
+  });
+}
+
+export function getSetupStatus(githubRepoId: number): Promise<SetupStatus> {
+  return apiFetch(`/api/repositories/${githubRepoId}/setup-status`);
 }
 
 // --- Exports ---
