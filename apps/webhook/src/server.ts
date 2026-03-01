@@ -9,7 +9,8 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { PRContext } from "@repo/core";
+import type { PRContext, RawAnnotationSection } from "@repo/core";
+import { processAndUploadVideo } from "@repo/core";
 import { verifySignature } from "./verify.js";
 import { dispatchJob, retryJob } from "./dispatch.js";
 
@@ -121,6 +122,13 @@ interface CommentPayload {
 
 const RETRY_COMMAND = /\/aura\s+(?:re-?run|retry)/i;
 
+interface PostprocessPayload {
+  runId?: string;
+  inputVideoUrl?: string;
+  outputPath?: string;
+  sections?: RawAnnotationSection[];
+}
+
 async function handleIssueComment(payload: CommentPayload): Promise<{
   dispatched: boolean;
   reason: string;
@@ -173,6 +181,48 @@ async function handleWebhook(
   // Health check
   if (req.method === "GET" && req.url === "/health") {
     json(res, 200, { status: "ok", service: "aura-webhook" });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/postprocess") {
+    const convexUrl = process.env.CONVEX_URL;
+    if (!convexUrl) {
+      json(res, 500, { error: "CONVEX_URL is required for postprocessing" });
+      return;
+    }
+
+    const body = await readBody(req);
+    let payload: PostprocessPayload;
+    try {
+      payload = JSON.parse(body) as PostprocessPayload;
+    } catch {
+      json(res, 400, { error: "Invalid JSON" });
+      return;
+    }
+
+    if (
+      typeof payload.runId !== "string" ||
+      payload.runId.length === 0 ||
+      typeof payload.inputVideoUrl !== "string" ||
+      !payload.inputVideoUrl.startsWith("http")
+    ) {
+      json(res, 400, {
+        error: "runId and inputVideoUrl are required",
+      });
+      return;
+    }
+
+    const result = await processAndUploadVideo(
+      {
+        runId: payload.runId,
+        inputVideoUrl: payload.inputVideoUrl,
+        outputPath: payload.outputPath,
+        sections: Array.isArray(payload.sections) ? payload.sections : [],
+      },
+      { convexUrl },
+    );
+
+    json(res, 200, result);
     return;
   }
 

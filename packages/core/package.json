@@ -16,6 +16,7 @@
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",
+    "@vitest/ui": "^4.0.18",
     "eslint": "^9.39.1",
     "typescript": "5.9.2",
     "vitest": "^4.0.18"

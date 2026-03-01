@@ -119,6 +119,30 @@ export async function updateRunStatus(
   });
 }
 
+export interface UpdateRunAnnotationsPayload {
+  annotations: Array<{
+    task: string;
+    path: string;
+    startMs: number;
+    endMs: number;
+    x: number;
+    y: number;
+  }>;
+  subtitlesVtt: string;
+}
+
+export async function updateRunAnnotations(
+  options: ConvexUploaderOptions,
+  runId: string,
+  payload: UpdateRunAnnotationsPayload,
+): Promise<void> {
+  await callMutation(options.convexUrl, "runs:updateAnnotations", {
+    id: runId,
+    annotations: payload.annotations,
+    subtitlesVtt: payload.subtitlesVtt,
+  });
+}
+
 export async function uploadVideo(
   options: ConvexUploaderOptions,
   runId: string,
