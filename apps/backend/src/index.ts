@@ -1,8 +1,10 @@
 import { fromHono } from "chanfana";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { getCookie } from "hono/cookie";
 import { ALLOWED_ORIGINS } from "./types";
 import { ConvexClient } from "./convex";
+import { verifySession } from "./cookie";
 import { GitHubAuthRedirect } from "./endpoints/githubAuth";
 import { GitHubCallback } from "./endpoints/githubCallback";
 import { SessionInfo } from "./endpoints/sessionInfo";
@@ -10,6 +12,8 @@ import { Logout } from "./endpoints/logout";
 import { runs } from "./endpoints/runs";
 import { edits } from "./endpoints/edits";
 import { exports_ } from "./endpoints/exports";
+import { repositories } from "./endpoints/repositories";
+import { webhooks } from "./endpoints/webhook";
 
 const app = new Hono<{ Bindings: Env; Variables: { convex: ConvexClient } }>();
 
@@ -23,7 +27,7 @@ app.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -48,6 +52,8 @@ openapi.post("/api/auth/logout", Logout);
 app.route("/api/runs", runs);
 app.route("/api/runs/:runId/edits", edits);
 app.route("/api/runs/:runId/exports", exports_);
+app.route("/api/repositories", repositories);
+app.route("/api/webhooks", webhooks);
 
 // Top-level ID-based routes for pipeline consumers
 app.patch("/api/edits/:editId/status", async (c) => {
@@ -105,6 +111,34 @@ app.post("/api/exports/:exportId/fail", async (c) => {
   });
 
   return c.json({ success: true, exportId, status: "failed" });
+});
+
+// API key endpoint — returns the user's API key
+app.get("/api/auth/api-key", async (c) => {
+  const raw = getCookie(c, "aura_session");
+  if (!raw) {
+    return c.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const session = await verifySession<{ github_user_id: number }>(
+    c.env.COOKIE_SECRET,
+    raw,
+  );
+  if (!session) {
+    return c.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const convex = c.get("convex");
+  const user = await convex.query<{ apiKey?: string } | null>(
+    "users:getByGithubId",
+    { githubUserId: session.github_user_id },
+  );
+
+  if (!user || !user.apiKey) {
+    return c.json({ error: "No API key found" }, { status: 404 });
+  }
+
+  return c.json({ apiKey: user.apiKey });
 });
 
 // Upload URL endpoint — generates Convex storage upload URL

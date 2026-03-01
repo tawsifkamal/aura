@@ -9,9 +9,11 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "blakejs": "^1.2.1",
     "chanfana": "^2.6.3",
     "hono": "^4.6.20",
     "prettier": "^3.8.1",
+    "tweetnacl": "^1.0.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {

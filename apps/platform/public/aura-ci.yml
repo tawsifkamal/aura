@@ -1,0 +1,28 @@
+# Aura CI — Notify Aura when a pull request is opened or updated.
+# Add this file to your repository at .github/workflows/aura-ci.yml
+#
+# Required repository secret:
+#   AURA_API_KEY — your Aura API key (find it in your Aura dashboard)
+
+name: Aura PR Notification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  notify-aura:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Aura
+        run: |
+          curl -s -X POST \
+            https://aura-backend.poppets-grungy03.workers.dev/api/webhooks/pr \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.AURA_API_KEY }}" \
+            -d '{
+              "repository_id": ${{ github.event.repository.id }},
+              "branch": "${{ github.head_ref }}",
+              "pr_number": ${{ github.event.pull_request.number }},
+              "commit_sha": "${{ github.event.pull_request.head.sha }}"
+            }'

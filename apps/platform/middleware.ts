@@ -1,27 +1,6 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/runs"];
-
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-}
-
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (!isProtectedRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  const session = request.cookies.get("session");
-
-  if (!session?.value) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
+export function middleware() {
   return NextResponse.next();
 }
 

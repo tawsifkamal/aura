@@ -1,26 +1,24 @@
 import { NextResponse } from "next/server";
 
-const VALID_EMAIL = "n@gmail.com";
-const VALID_PASS = "12345678";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
-export async function POST(request: Request) {
-  const { email, password } = await request.json();
-
-  if (email === VALID_EMAIL && password === VALID_PASS) {
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set("session", "authenticated", {
-      httpOnly: true,
-      path: "/",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+/**
+ * DELETE /api/auth — Log out.
+ * Clears the platform session cookie and calls the backend logout endpoint.
+ */
+export async function DELETE(request: Request) {
+  // Call backend logout to clear the aura_session cookie
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: {
+        Cookie: request.headers.get("cookie") ?? "",
+      },
     });
-    return response;
+  } catch {
+    // Best effort — clear platform cookie even if backend is unreachable
   }
 
-  return NextResponse.json({ ok: false, error: "Invalid credentials" }, { status: 401 });
-}
-
-export async function DELETE() {
   const response = NextResponse.json({ ok: true });
   response.cookies.set("session", "", {
     httpOnly: true,
