@@ -1,79 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { getGitHubAuthUrl } from "../api-client";
 import styles from "./page.module.css";
 
 export default function SignIn() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (res.ok) {
-      router.push("/dashboard");
-    } else {
-      setError("Invalid credentials");
-      setLoading(false);
-    }
+  function handleGitHubSignIn() {
+    // After OAuth, backend redirects to /api/auth/callback which sets the platform cookie
+    const callbackUrl = `${window.location.origin}/api/auth/callback`;
+    window.location.href = getGitHubAuthUrl(callbackUrl);
   }
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <h1 className={styles.title}>Sign in</h1>
-        <p className={styles.subtitle}>Enter your credentials</p>
+        <p className={styles.subtitle}>Connect your GitHub account</p>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              className={styles.input}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              className={styles.input}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              minLength={8}
-            />
-          </div>
-
-          {error ? <div className={styles.error}>{error}</div> : null}
-
-          <button className={styles.submit} type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+        <button
+          className={styles.submit}
+          onClick={handleGitHubSignIn}
+          type="button"
+        >
+          Sign in with GitHub
+        </button>
       </div>
     </div>
   );

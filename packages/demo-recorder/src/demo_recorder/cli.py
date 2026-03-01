@@ -60,6 +60,12 @@ def main() -> None:
         default="browser-use",
         help="LLM model: browser-use (default), claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash",
     )
+    parser.add_argument(
+        "--convex-url",
+        type=str,
+        default=None,
+        help="Convex deployment URL to upload video (e.g. https://hardy-salmon-997.convex.cloud)",
+    )
     args = parser.parse_args()
 
     # Parse tasks JSON
@@ -81,6 +87,7 @@ def main() -> None:
             output_dir=args.output_dir,
             max_steps=args.max_steps,
             model=args.model,
+            convex_url=args.convex_url,
         )
     )
 
@@ -97,6 +104,8 @@ def main() -> None:
     print(f"REASONING: {result.verdict_reasoning or ''}")
     print(f"VIDEO: {video_path or 'not found'}")
     print(f"OUTPUT_DIR: {result.output_path}")
+    if result.video_url:
+        print(f"VIDEO_URL: {result.video_url}")
 
     if not result.success:
         print(f"ERROR: {result.error}", file=sys.stderr)

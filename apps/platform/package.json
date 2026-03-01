@@ -11,9 +11,7 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@convex-dev/better-auth": "^0.10.13",
     "@repo/ui": "*",
-    "better-auth": "1.4.9",
     "convex": "^1.32.0",
     "next": "16.1.5",
     "react": "^19.2.0",

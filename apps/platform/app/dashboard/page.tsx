@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DEMO_RUNS } from "./data";
+import { listRuns, getSession, type RunListItem, type Session } from "../api-client";
+import { useApi } from "../hooks";
 import styles from "./page.module.css";
 
 function formatTime(ts: number): string {
@@ -10,27 +11,25 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-function formatDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  return `${String(m)}m ${String(rem)}s`;
-}
-
 export default function Dashboard() {
   const router = useRouter();
+  const runs = useApi<RunListItem[]>(() => listRuns(), []);
+  const session = useApi<{ authenticated: boolean; session: Session | null }>(
+    () => getSession().catch(() => ({ authenticated: false, session: null })),
+    [],
+  );
 
   async function handleSignOut() {
     await fetch("/api/auth", { method: "DELETE" });
     router.push("/sign-in");
   }
+
+  const user = session?.session;
 
   return (
     <div className={styles.page}>
@@ -38,56 +37,58 @@ export default function Dashboard() {
         <div>
           <h1 className={styles.title}>Glimpse</h1>
           <span className={styles.subtitle}>
-            {DEMO_RUNS.length} recordings
+            {runs ? `${String(runs.length)} recording${runs.length !== 1 ? "s" : ""}` : "loading..."}
           </span>
         </div>
-        <button
-          className={styles.signOutButton}
-          onClick={handleSignOut}
-          type="button"
-        >
-          Sign out
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {user ? (
+            <span style={{ fontSize: "13px", fontFamily: "var(--font-geist-mono), monospace", opacity: 0.6 }}>
+              @{user.github_login}
+            </span>
+          ) : null}
+          <button
+            className={styles.signOutButton}
+            onClick={handleSignOut}
+            type="button"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
-      <div className={styles.grid}>
-        {DEMO_RUNS.map((run) => (
-          <Link
-            key={run.id}
-            href={`/dashboard/${run.id}`}
-            className={styles.card}
-          >
-            <div className={styles.cardTop}>
+      {runs === undefined ? (
+        <div className={styles.empty}>
+          <p>loading...</p>
+        </div>
+      ) : runs.length === 0 ? (
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>No recordings yet</p>
+          <p>
+            Run <code>/record-demo</code> or open a PR to generate a demo
+            video.
+          </p>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {runs.map((run) => (
+            <Link
+              key={run._id}
+              href={`/runs/${run._id}`}
+              className={styles.card}
+            >
+              <div className={styles.cardHeader}>
+                <span className={styles.cardBadge}>{run.status}</span>
+                <span className={styles.cardSource}>{run.source}</span>
+              </div>
+              <p className={styles.cardSummary}>{run.summary}</p>
               <div className={styles.cardMeta}>
                 <span>{formatTime(run.timestamp)}</span>
-                <span>{run.commitSha}</span>
+                {run.branch ? <span>{run.branch}</span> : null}
               </div>
-              <span className={styles.badgeCompleted}>{run.status}</span>
-            </div>
-
-            <div className={styles.thumbnail}>
-              <span className={styles.thumbnailPlaceholder}>{run.title}</span>
-            </div>
-
-            <p className={styles.summary}>{run.summary}</p>
-
-            <div className={styles.cardBottom}>
-              <span className={styles.sourceTag}>{run.source}</span>
-              <span className={styles.sourceTag}>
-                {formatDuration(run.durationMs)}
-              </span>
-            </div>
-
-            <div className={styles.routes}>
-              {run.routesTested.map((route) => (
-                <span key={route} className={styles.route}>
-                  {route}
-                </span>
-              ))}
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
