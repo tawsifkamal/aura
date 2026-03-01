@@ -22,6 +22,17 @@ export {
 export type { DevServerOptions, DevServerHandle } from "./dev-server.js";
 
 export {
+  extractInteractiveElements,
+  generateInteractionPlan,
+} from "./interaction-planner.js";
+export type {
+  InteractionType,
+  InteractiveElement,
+  InteractionStep,
+  InteractionPlan,
+} from "./interaction-planner.js";
+
+export {
   createSession,
   createOutputDir,
   addStep,

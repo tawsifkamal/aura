@@ -168,6 +168,62 @@ If Supermemory is configured (`SUPERMEMORY_ENDPOINT` env var):
 - Call `writeSummary()` to generate `demos/[timestamp]/summary.md`
 - Call `completeSession()` to mark the session as done
 
+## Step 4: AI-Driven Interaction Based on Diff
+
+Use `generateInteractionPlan()` from `@repo/core/interaction-planner` to analyze the diff
+and decide what to interact with. The implementation lives in `packages/core/src/interaction-planner.ts`.
+
+### 4a. Extract interactive elements from diff
+
+Parse the git diff content (from Step 1d) to find:
+- **HTML/JSX elements**: `<button>`, `<input>`, `<textarea>`, `<select>`, `<form>`, `<a>`, checkboxes, radios
+- **ARIA roles**: `role="button"`, `role="tab"`, `role="switch"`
+- **Event handlers**: `onClick`, `onSubmit`, `onChange`, `onInput`, `onToggle`
+
+For each element found, extract the best selector in priority order:
+1. `id` attribute -> `#myButton`
+2. `data-testid` -> `[data-testid="submit-btn"]`
+3. `aria-label` -> `[aria-label="Close"]`
+4. `className` -> `button.primary`
+5. Text content -> `button:has-text("Save")`
+6. Fallback to element type -> `button`
+
+### 4b. Generate interaction plan
+
+`generateInteractionPlan(diff, routes)` returns a structured plan:
+- Each step maps an interactive element to its route
+- Steps sorted by confidence (high first) then action type (click > type > select > toggle > submit)
+- Each step includes: route, selector, action type, wait time, and whether to screenshot after
+
+### 4c. Execute the interaction plan
+
+For each step in the plan, use browser-use to:
+1. Navigate to the step's route (if not already there)
+2. Wait for the target element to be visible
+3. Perform the action:
+   - **click**: Click the element
+   - **type**: Type sample text into the field (use realistic placeholder data)
+   - **select**: Select the first available option
+   - **toggle**: Click to toggle state
+   - **submit**: Fill required fields first, then submit
+4. Wait the specified duration (500ms for most, 2000ms for submit)
+5. Take a screenshot and log the step
+
+### 4d. Handle missing elements gracefully
+
+If a planned element is not found on the page:
+- Log it as skipped (the diff may reference a component not yet rendered)
+- Continue with the next step
+- Do not fail the entire recording
+
+Print a summary of the interaction plan before executing:
+```
+Interaction Plan: [N] actions across [M] routes
+  1. [click] button:has-text("Save") on /settings (high confidence)
+  2. [type] input#email on /profile (high confidence)
+  3. [toggle] [role="switch"] on /settings (medium confidence)
+```
+
 ## Step 5: Generate Demo Output
 
 Create a `demos/[timestamp]/` folder containing:
