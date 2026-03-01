@@ -34,6 +34,7 @@ export async function writeDiffFile(
 export interface AnalysisResult {
   has_ui_changes: boolean;
   setup: string[];
+  base_url: string;
   tasks: Array<{ id: string; description: string }>;
 }
 
@@ -45,9 +46,10 @@ export async function analyzeChanges(
     "Read the file __pr_diff.patch which contains the PR diff. " +
     "Also explore the repo to understand context (package.json, README, etc). " +
     "Then write a JSON object to __testing_steps.json with this exact schema: " +
-    '{"has_ui_changes": true/false, "setup": ["npm install", "npm run dev"], "tasks": [{"id": "kebab-id", "description": "Navigate to /path. Do action. Verify result."}]} ' +
+    '{"has_ui_changes": true/false, "setup": ["npm install", "npm run dev"], "base_url": "http://localhost:3000", "tasks": [{"id": "kebab-id", "description": "Navigate to /path. Do action. Verify result."}]} ' +
     "has_ui_changes: true if the PR includes any changes visible in the browser UI, false if it only touches backend/config/docs. " +
-    "setup: shell commands to install deps and start the dev server on port 3000 (e.g. npm install, npm run dev). Look at package.json scripts to determine the right commands. " +
+    "setup: shell commands to install deps and start the dev server. Look at package.json scripts to determine the right commands. " +
+    "base_url: the URL where the app is served locally after running the setup commands (e.g. http://localhost:3000). Check package.json, framework config, or dev server settings to determine the correct port. " +
     "tasks: browser testing steps (empty array if has_ui_changes is false). " +
     "Task rules: Start with Navigate to /path. Use element IDs like id=search-input. End with a verification. Be specific. Each step tests ONE change. " +
     "Write the file now.";

@@ -139,6 +139,7 @@ webhooks.post("/pr", async (c) => {
           if (analysis.has_ui_changes) {
             await updateComment(
               `✅ Analysis complete.\n\n` +
+              `**Base URL:** \`${analysis.base_url}\`\n\n` +
               `**Setup:**\n\`\`\`bash\n${analysis.setup.join("\n")}\n\`\`\`\n\n` +
               `**Testing steps:**\n\`\`\`json\n${JSON.stringify(analysis.tasks, null, 2)}\n\`\`\``
             );
