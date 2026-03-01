@@ -74,3 +74,15 @@ export type {
   FFmpegCommand,
   RenderManifest,
 } from "./video-processor.js";
+
+export {
+  createRun,
+  updateRunStatus,
+  uploadVideo,
+  uploadScreenshots,
+} from "./convex-uploader.js";
+export type {
+  RunMetadata,
+  UploadResult,
+  ConvexUploaderOptions,
+} from "./convex-uploader.js";

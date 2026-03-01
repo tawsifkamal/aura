@@ -276,9 +276,22 @@ Call `writeSummary()` from `@repo/core/browser-recorder` to create `summary.md` 
 - Step-by-step action log with timestamps
 - Description of changes tested
 
-### 5f. Report results
+### 5f. Upload to dashboard
 
-Print the final output to the user:
+Use `@repo/core/convex-uploader` to upload the recording to the Aura dashboard (Convex backend):
+
+1. Call `createRun()` with metadata (timestamp, branch, commitSha, summary, source: "skill", routesTested)
+2. Call `updateRunStatus()` to set status to "uploading"
+3. Call `uploadVideo()` to upload the MP4 to Convex storage
+4. Call `uploadScreenshots()` to upload screenshot files
+5. Call `updateRunStatus()` to set status to "completed" with durationMs
+
+The Convex URL defaults to `CONVEX_URL` env var or `http://localhost:3210`.
+The dashboard base URL defaults to `http://localhost:3000`.
+
+### 5g. Report results
+
+Print the final output to the user, including the dashboard link:
 ```
 Demo recorded successfully!
 Output: demos/YYYYMMDD-HHMMSS/
@@ -286,6 +299,8 @@ Output: demos/YYYYMMDD-HHMMSS/
   - screenshots/ ([N] screenshots)
   - summary.md
   - render-manifest.json
+
+Dashboard: [dashboard URL for this run]
 
 Summary: [brief description of what was recorded]
 Duration: [X]s | Resolution: 1280x720 | FPS: 30
@@ -298,6 +313,7 @@ Duration: [X]s | Resolution: 1280x720 | FPS: 30
 - Video post-processing uses FFmpeg via Node.js child_process
 - Cursor animation uses cubic bezier interpolation for smooth, deterministic paths
 - Zoom effects use asymmetric easing (fast zoom-in, slow zoom-out)
+- Dashboard backed by Convex (schema in `apps/web/convex/schema.ts`)
 - All orchestration is TypeScript-first
 
 ## Arguments
