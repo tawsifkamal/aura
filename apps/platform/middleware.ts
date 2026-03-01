@@ -14,11 +14,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const sessionCookie =
-    request.cookies.get("better-auth.session_token") ??
-    request.cookies.get("__Secure-better-auth.session_token");
+  const session = request.cookies.get("session");
 
-  if (!sessionCookie?.value) {
+  if (!session?.value) {
     const signInUrl = new URL("/sign-in", request.url);
     signInUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(signInUrl);
