@@ -6,6 +6,8 @@ export const upsert = mutation({
     githubUserId: v.number(),
     githubLogin: v.string(),
     accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    apiKey: v.optional(v.string()),
     scopes: v.string(),
     repositories: v.array(
       v.object({
@@ -32,6 +34,8 @@ export const upsert = mutation({
       await ctx.db.patch(existing._id, {
         githubLogin: args.githubLogin,
         accessToken: args.accessToken,
+        refreshToken: args.refreshToken,
+        ...(args.apiKey ? { apiKey: args.apiKey } : {}),
         scopes: args.scopes,
         repositories: args.repositories,
         connectedAt: args.connectedAt,
@@ -40,6 +44,16 @@ export const upsert = mutation({
     }
 
     return ctx.db.insert("users", args);
+  },
+});
+
+export const getByApiKey = query({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("users")
+      .withIndex("by_api_key", (q) => q.eq("apiKey", args.apiKey))
+      .unique();
   },
 });
 

@@ -10,6 +10,8 @@ import { Logout } from "./endpoints/logout";
 import { runs } from "./endpoints/runs";
 import { edits } from "./endpoints/edits";
 import { exports_ } from "./endpoints/exports";
+import { repositories } from "./endpoints/repositories";
+import { webhooks } from "./endpoints/webhook";
 
 const app = new Hono<{ Bindings: Env; Variables: { convex: ConvexClient } }>();
 
@@ -23,7 +25,7 @@ app.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -48,6 +50,8 @@ openapi.post("/api/auth/logout", Logout);
 app.route("/api/runs", runs);
 app.route("/api/runs/:runId/edits", edits);
 app.route("/api/runs/:runId/exports", exports_);
+app.route("/api/repositories", repositories);
+app.route("/api/webhooks", webhooks);
 
 // Top-level ID-based routes for pipeline consumers
 app.patch("/api/edits/:editId/status", async (c) => {

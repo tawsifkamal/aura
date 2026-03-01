@@ -12,6 +12,8 @@ interface GitHubTokenResponse {
   access_token: string;
   token_type: string;
   scope: string;
+  refresh_token?: string;
+  refresh_token_expires_in?: number;
   error?: string;
   error_description?: string;
 }
@@ -131,6 +133,7 @@ export class GitHubCallback extends OpenAPIRoute {
     }
 
     const accessToken = tokenData.access_token;
+    const refreshToken = tokenData.refresh_token;
     const scopes = tokenData.scope;
 
     // Fetch user profile and repos in parallel
@@ -192,10 +195,19 @@ export class GitHubCallback extends OpenAPIRoute {
 
     // Store credentials in Convex
     const convex = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_DEPLOY_KEY);
-    await convex.mutation("users:upsert", {
+
+    // Check if user already has an API key; generate one if not
+    const existingUser = await convex.query<{ apiKey?: string } | null>(
+      "users:getByGithubId",
+      { githubUserId: user.id },
+    );
+    const apiKey = existingUser?.apiKey ?? `aura_${crypto.randomUUID().replace(/-/g, "")}`;
+
+    const userId = await convex.mutation<string>("users:upsert", {
       githubUserId: user.id,
       githubLogin: user.login,
       accessToken: accessToken,
+      refreshToken: refreshToken,
       scopes,
       repositories: repoList.map((r) => ({
         id: r.id,
@@ -207,6 +219,7 @@ export class GitHubCallback extends OpenAPIRoute {
         defaultBranch: r.default_branch,
       })),
       connectedAt: credentials.connected_at,
+      apiKey,
     });
 
     // Build signed session cookie with user profile info
@@ -250,7 +263,10 @@ export class GitHubCallback extends OpenAPIRoute {
     }
 
     if (redirectTo && ALLOWED_ORIGINS.some((o) => redirectTo!.startsWith(o))) {
-      return c.redirect(redirectTo, 302);
+      // Pass the signed session token so the platform can set it as its own cookie
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("token", signedValue);
+      return c.redirect(redirectUrl.toString(), 302);
     }
 
     return c.json({

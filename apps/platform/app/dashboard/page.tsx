@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { listRuns, getSession, type RunListItem, type Session } from "../api-client";
+import { listRuns, logout, type RunListItem } from "../api-client";
 import { useApi } from "../hooks";
+import { useAuth } from "../auth-provider";
 import styles from "./page.module.css";
 
 function formatTime(ts: number): string {
@@ -18,18 +19,22 @@ function formatTime(ts: number): string {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { session, loading } = useAuth();
   const runs = useApi<RunListItem[]>(() => listRuns(), []);
-  const session = useApi<{ authenticated: boolean; session: Session | null }>(
-    () => getSession().catch(() => ({ authenticated: false, session: null })),
-    [],
-  );
 
   async function handleSignOut() {
+    await logout();
     await fetch("/api/auth", { method: "DELETE" });
     router.push("/sign-in");
   }
 
-  const user = session?.session;
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.empty}><p>loading...</p></div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -41,9 +46,9 @@ export default function Dashboard() {
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {user ? (
+          {session ? (
             <span style={{ fontSize: "13px", fontFamily: "var(--font-geist-mono), monospace", opacity: 0.6 }}>
-              @{user.github_login}
+              @{session.github_login}
             </span>
           ) : null}
           <button

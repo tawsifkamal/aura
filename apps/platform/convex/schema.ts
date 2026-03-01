@@ -6,6 +6,8 @@ export default defineSchema({
     githubUserId: v.number(),
     githubLogin: v.string(),
     accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    apiKey: v.optional(v.string()),
     scopes: v.string(),
     repositories: v.array(
       v.object({
@@ -19,7 +21,30 @@ export default defineSchema({
       }),
     ),
     connectedAt: v.string(),
-  }).index("by_github_user_id", ["githubUserId"]),
+  })
+    .index("by_github_user_id", ["githubUserId"])
+    .index("by_api_key", ["apiKey"]),
+
+  repositories: defineTable({
+    userId: v.id("users"),
+    githubRepoId: v.number(),
+    fullName: v.string(),
+    name: v.string(),
+    owner: v.string(),
+    isPrivate: v.boolean(),
+    htmlUrl: v.string(),
+    defaultBranch: v.string(),
+    status: v.union(
+      v.literal("available"),
+      v.literal("added"),
+      v.literal("synced"),
+    ),
+    addedAt: v.optional(v.number()),
+    lastSyncedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_github_id", ["userId", "githubRepoId"])
+    .index("by_status", ["status"]),
 
   runs: defineTable({
     timestamp: v.number(),
