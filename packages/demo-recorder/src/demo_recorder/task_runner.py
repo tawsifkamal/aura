@@ -401,18 +401,23 @@ async def run_tasks(
         recording_start_time = time.time()
         history = await agent.run(max_steps=max_steps)
 
-        # ── Compute trim offset (dead time before first browser action) ──
+        # ── Compute trim offset: find when browser first navigates to localhost ──
         trim_offset_sec = 0.0
         if use_xvfb and history.history:
             try:
-                first_step = history.history[0]
-                if first_step.metadata and hasattr(first_step.metadata, 'step_start_time'):
-                    first_step_start = first_step.metadata.step_start_time
-                    trim_offset_sec = first_step_start - recording_start_time
-                    # Subtract a small buffer so we don't cut into the action
-                    trim_offset_sec = max(0.0, trim_offset_sec - 0.5)
+                for step in history.history:
+                    # Check if this step's URL points to the app (localhost)
+                    step_url = getattr(step.state, 'url', '') or ''
+                    if 'localhost' in step_url or '127.0.0.1' in step_url:
+                        if step.metadata and hasattr(step.metadata, 'step_start_time'):
+                            first_nav_time = step.metadata.step_start_time
+                            trim_offset_sec = first_nav_time - recording_start_time
+                            trim_offset_sec = max(0.0, trim_offset_sec - 0.5)
+                            print(f"  First localhost URL at step: {step_url}")
+                        break
             except (AttributeError, IndexError):
                 trim_offset_sec = 0.0
+        print(f"  Trim offset: {trim_offset_sec:.2f}s")
 
         # ── Extract interaction events from history ──
         interaction_events = extract_interaction_events(history, recording_start_time)
