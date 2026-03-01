@@ -289,21 +289,40 @@ Use `@repo/core/convex-uploader` to upload the recording to the Aura dashboard (
 The Convex URL defaults to `CONVEX_URL` env var or `http://localhost:3210`.
 The dashboard base URL defaults to `http://localhost:3000`.
 
-### 5g. Report results
+### 5g. Report results with dashboard link
 
-Print the final output to the user, including the dashboard link:
+**IMPORTANT**: The final response to the user MUST always include:
+1. The **dashboard link** pointing to the specific run (e.g., `http://localhost:3000/runs/<runId>`) — not just the dashboard root
+2. A **short summary** of what was recorded and tested
+3. Local file paths for reference
+
+The `createRun()` function from Step 5f returns `{ runId, dashboardUrl }`. Use `dashboardUrl` directly in the output.
+
+Print the final output in this format:
+
 ```
 Demo recorded successfully!
-Output: demos/YYYYMMDD-HHMMSS/
+
+**Dashboard**: <dashboardUrl>
+
+**Summary**: <1-2 sentence description of what frontend areas were recorded and tested>
+
+**Routes tested**: /, /settings, /profile (list the routes visited)
+
+Local files: demos/YYYYMMDD-HHMMSS/
   - recording.mp4 (Screen Studio-style, [preset] preset)
   - screenshots/ ([N] screenshots)
   - summary.md
   - render-manifest.json
 
-Dashboard: [dashboard URL for this run]
-
-Summary: [brief description of what was recorded]
 Duration: [X]s | Resolution: 1280x720 | FPS: 30
+```
+
+If the upload to the dashboard fails, still report the local files and note the upload failure:
+```
+Demo recorded successfully! (dashboard upload failed: <error>)
+Local files: demos/YYYYMMDD-HHMMSS/
+...
 ```
 
 ## Implementation Notes
@@ -314,6 +333,7 @@ Duration: [X]s | Resolution: 1280x720 | FPS: 30
 - Cursor animation uses cubic bezier interpolation for smooth, deterministic paths
 - Zoom effects use asymmetric easing (fast zoom-in, slow zoom-out)
 - Dashboard backed by Convex (schema in `apps/web/convex/schema.ts`)
+- Dashboard link must point to the specific run (`/runs/<runId>`), never just `/`
 - All orchestration is TypeScript-first
 
 ## Arguments
