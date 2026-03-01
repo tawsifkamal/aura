@@ -141,7 +141,7 @@ interface RecordingResult {
 
 async function createSandbox(apiKey: string): Promise<{ daytona: Daytona; sandbox: Sandbox }> {
   const daytona = new Daytona({ apiKey });
-  const sandbox = await daytona.create({ snapshot: "glimpse" });
+  const sandbox = await daytona.create({ snapshot: "glimpse-v2" });
   return { daytona, sandbox };
 }
 
