@@ -1,8 +1,8 @@
 FROM python:3.12
 
-# System deps for Playwright + ffmpeg + Xvfb (virtual display) + git
+# System deps for Playwright + ffmpeg + Xvfb (virtual display) + git + SVG rendering
 RUN apt-get update && apt-get install -y \
-    git curl ffmpeg xvfb xdotool \
+    git curl ffmpeg xvfb xdotool librsvg2-bin \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
     libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 \
@@ -20,7 +20,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
 RUN curl -fsSL https://opencode.ai/install | bash
 
 # Cache-bust: change this value to force re-pull from GitHub
-ARG CACHE_BUST=20260301_trim_localhost
+ARG CACHE_BUST=20260301_postprocess
 
 # Install demo-recorder from GitHub + browser-use video support
 RUN pip install --no-cache-dir "git+https://github.com/tawsifkamal/aura.git#subdirectory=packages/demo-recorder" && \
@@ -30,6 +30,15 @@ RUN pip install --no-cache-dir "git+https://github.com/tawsifkamal/aura.git#subd
 RUN mkdir -p /root/.claude && \
     curl -fsSL https://raw.githubusercontent.com/tawsifkamal/aura/main/packages/demo-recorder/CLAUDE.md \
     -o /root/.claude/CLAUDE.md
+
+# Post-processing: cursor PNG + postprocess script at /opt/aura/
+RUN mkdir -p /opt/aura && \
+    curl -fsSL https://raw.githubusercontent.com/tawsifkamal/aura/main/packages/core/icons8-cursor-filled.svg \
+      -o /tmp/cursor.svg && \
+    rsvg-convert -w 50 -h 50 /tmp/cursor.svg -o /opt/aura/cursor.png && \
+    rm /tmp/cursor.svg && \
+    curl -fsSL https://raw.githubusercontent.com/tawsifkamal/aura/main/packages/demo-recorder/postprocess.mjs \
+      -o /opt/aura/postprocess.mjs
 
 # Install Playwright browser
 RUN playwright install chromium
