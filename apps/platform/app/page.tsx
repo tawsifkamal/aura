@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import styles from "./page.module.css";
 
 /* ── Scroll-reveal hook ── */
@@ -107,7 +108,7 @@ export default function LandingPage() {
         <div className={styles.navLinks}>
           <span className={styles.navLink} onClick={() => smoothScroll("features")}>Features</span>
           <span className={styles.navLink} onClick={() => smoothScroll("use-cases")}>Use cases</span>
-          <a href="/dashboard" className={styles.navCta}>Dashboard</a>
+          <Link href="/dashboard" className={styles.navCta}>Dashboard</Link>
         </div>
       </nav>
 
@@ -140,10 +141,10 @@ export default function LandingPage() {
         </p>
 
         <div className={styles.heroCtas}>
-          <a href="/dashboard" className={styles.ctaPrimary}>
+          <Link href="/dashboard" className={styles.ctaPrimary}>
             Open Dashboard
             <span>&rarr;</span>
-          </a>
+          </Link>
           <button className={styles.ctaSecondary} onClick={() => smoothScroll("features")}>
             See how it works
           </button>
@@ -751,10 +752,10 @@ export default function LandingPage() {
           Set it up once, forget about it forever.
         </p>
         <div className={styles.ctaButtons}>
-          <a href="/dashboard" className={styles.ctaPrimary}>
+          <Link href="/dashboard" className={styles.ctaPrimary}>
             Get started
             <span>&rarr;</span>
-          </a>
+          </Link>
           <a
             href="https://github.com"
             target="_blank"
@@ -812,7 +813,7 @@ export default function LandingPage() {
           <div className={styles.footerCopy}>&copy; 2026 Glimpse. All rights reserved.</div>
         </div>
         <div className={styles.footerLinks}>
-          <a href="/dashboard" className={styles.footerLink}>Dashboard</a>
+          <Link href="/dashboard" className={styles.footerLink}>Dashboard</Link>
           <a href="https://github.com" target="_blank" rel="noopener noreferrer" className={styles.footerLink}>GitHub</a>
           <span className={styles.footerLink}>Docs</span>
           <span className={styles.footerLink}>Changelog</span>
