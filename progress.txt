@@ -278,3 +278,22 @@
   - Cost estimation: basic tier ~$0.012/min (SD), professional ~$0.048/min (HD)
   - Fallback pattern: check config → null means no AWS → fall back to local FFmpeg
 ---
+
+## 2026-02-28 - US-017
+- Created `apps/webhook/` as a standalone Node.js HTTP server (no framework dependency)
+- `server.ts`: HTTP server handling GitHub webhook events at `/webhook` and health checks at `/health`
+- Handles `pull_request` (opened/synchronize/reopened) and `issue_comment` (for `/aura re-run` commands)
+- `verify.ts`: HMAC-SHA256 signature verification using `x-hub-signature-256` header
+- `dispatch.ts`: Job dispatch lifecycle — creates Convex run, posts PR bot comment, transitions status
+- `retryJob()`: Re-creates a new run for the same PR (triggered by `/aura re-run` comment)
+- Accepts `ping` events for GitHub App configuration verification
+- Deployable as standalone service (Fly.io, Railway, AWS) — listens on `PORT` env var (default 3001)
+- Added webhook env vars (`GITHUB_WEBHOOK_SECRET`, `DASHBOARD_BASE_URL`, `PORT`) to `turbo.json` `globalEnv`
+- Files changed: `apps/webhook/` (new app), `turbo.json`, `package-lock.json`
+- **Learnings for future iterations:**
+  - `createRun()` signature is `(options: ConvexUploaderOptions, metadata: RunMetadata)` — options first, metadata second
+  - `postOrUpdateComment()` takes `(options: PRBotOptions, context: PRContext, state: CommentState)` — 3 args
+  - `updateCommentStatus()` updates field is `Partial<Pick<CommentState, "summary" | "routesTested" | "videoUrl" | "dashboardUrl" | "error">>` — does NOT include `runId`
+  - New monorepo apps need `npm install` to register them in workspaces before turbo can find them
+  - Add `dist/**` to turbo build outputs for tsc-compiled apps alongside `.next/**`
+---

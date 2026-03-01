@@ -21,13 +21,16 @@
     "AWS_VIDEO_OUTPUT_BUCKET",
     "AWS_MEDIACONVERT_ROLE_ARN",
     "AWS_MEDIACONVERT_QUEUE_ARN",
-    "AWS_VIDEO_DLQ_URL"
+    "AWS_VIDEO_DLQ_URL",
+    "GITHUB_WEBHOOK_SECRET",
+    "DASHBOARD_BASE_URL",
+    "PORT"
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
