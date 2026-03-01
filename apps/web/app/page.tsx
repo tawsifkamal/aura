@@ -1,8 +1,10 @@
 "use client";
 
+import { useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { listRuns, type Run } from "./api-client";
-import { useApi } from "./hooks";
+import { api } from "../convex/_generated/api";
+import type { RunWithVideo } from "./types";
 import styles from "./page.module.css";
 
 function formatTime(ts: number): string {
@@ -39,7 +41,13 @@ function badgeClass(status: string): string {
 }
 
 export default function Dashboard() {
-  const runs = useApi<Run[]>(() => listRuns(), []);
+  const router = useRouter();
+  const runs = useQuery(api.runs.list, {}) as RunWithVideo[] | undefined;
+
+  async function handleSignOut() {
+    await fetch("/api/auth", { method: "DELETE" });
+    router.push("/sign-in");
+  }
 
   if (runs === undefined) {
     return (
@@ -55,10 +63,15 @@ export default function Dashboard() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Aura</h1>
-        <span className={styles.subtitle}>
-          {runs.length} {runs.length === 1 ? "recording" : "recordings"}
-        </span>
+        <div>
+          <h1 className={styles.title}>Aura</h1>
+          <span className={styles.subtitle}>
+            {runs.length} {runs.length === 1 ? "recording" : "recordings"}
+          </span>
+        </div>
+        <button className={styles.signOutButton} onClick={handleSignOut} type="button">
+          Sign out
+        </button>
       </header>
 
       {runs.length === 0 ? (
