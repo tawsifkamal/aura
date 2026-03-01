@@ -1,8 +1,11 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import type { ExportJob } from "../../../types";
+import {
+  listExports,
+  createExport as apiCreateExport,
+  type ExportJob,
+} from "../../../api-client";
+import { useApi } from "../../../hooks";
 import Link from "next/link";
 import { use, useState } from "react";
 import styles from "./page.module.css";
@@ -36,10 +39,7 @@ export default function ExportPage(props: {
   params: Promise<{ runId: string }>;
 }) {
   const { runId } = use(props.params);
-  const exportJobs = useQuery(api.exports.list, {
-    runId: runId as never,
-  }) as ExportJob[] | undefined;
-  const createExport = useMutation(api.exports.create);
+  const exportJobs = useApi<ExportJob[]>(() => listExports(runId), [runId]);
 
   const [format, setFormat] = useState<Format>("mp4");
   const [quality, setQuality] = useState<Quality>("web");
@@ -53,8 +53,7 @@ export default function ExportPage(props: {
   async function handleExport() {
     setSubmitting(true);
     try {
-      await createExport({
-        runId: runId as never,
+      await apiCreateExport(runId, {
         format,
         fps,
         width: selectedRes.width,

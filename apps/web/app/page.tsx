@@ -1,9 +1,8 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import Link from "next/link";
-import { api } from "../convex/_generated/api";
-import type { RunWithVideo } from "./types";
+import { listRuns, type Run } from "./api-client";
+import { useApi } from "./hooks";
 import styles from "./page.module.css";
 
 function formatTime(ts: number): string {
@@ -40,7 +39,7 @@ function badgeClass(status: string): string {
 }
 
 export default function Dashboard() {
-  const runs = useQuery(api.runs.list, {}) as RunWithVideo[] | undefined;
+  const runs = useApi<Run[]>(() => listRuns(), []);
 
   if (runs === undefined) {
     return (

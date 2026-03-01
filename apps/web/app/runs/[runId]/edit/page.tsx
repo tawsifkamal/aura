@@ -1,8 +1,14 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import type { RunDetail } from "../../../types";
+import {
+  getRun,
+  listEditVersions,
+  applyEdit as apiApplyEdit,
+  revertEdits,
+  type RunDetail,
+  type EditVersion,
+} from "../../../api-client";
+import { useApi } from "../../../hooks";
 import Link from "next/link";
 import { use, useState } from "react";
 import styles from "./page.module.css";
@@ -20,22 +26,14 @@ export default function EditPage(props: {
   params: Promise<{ runId: string }>;
 }) {
   const { runId } = use(props.params);
-  const run = useQuery(api.runs.get, {
-    id: runId as never,
-  }) as RunDetail | null | undefined;
-  const versions = useQuery(api.edits.listVersions, {
-    runId: runId as never,
-  }) as
-    | Array<{
-        _id: string;
-        version: number;
-        status: string;
-        videoUrl: string | null;
-        operations: unknown[];
-      }>
-    | undefined;
-  const applyEdit = useMutation(api.edits.applyEdit);
-  const revertEdit = useMutation(api.edits.revert);
+  const run = useApi<RunDetail | null>(
+    () => getRun(runId).catch(() => null),
+    [runId],
+  );
+  const versions = useApi<EditVersion[]>(
+    () => listEditVersions(runId),
+    [runId],
+  );
 
   const [activeTab, setActiveTab] = useState<EditType>("trim");
   const [preset, setPreset] = useState<Preset>("default");
@@ -132,17 +130,14 @@ export default function EditPage(props: {
     }
 
     const latestVersion = versions?.[0];
-    await applyEdit({
-      runId: runId as never,
-      parentVersionId: latestVersion?._id
-        ? (latestVersion._id as never)
-        : undefined,
-      operation: operation as never,
+    await apiApplyEdit(runId, {
+      parentVersionId: latestVersion?._id,
+      operation,
     });
   }
 
   async function handleRevert() {
-    await revertEdit({ runId: runId as never });
+    await revertEdits(runId);
   }
 
   const tabs: Array<{ key: EditType; label: string }> = [
