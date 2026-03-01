@@ -132,11 +132,20 @@ interface AnalysisResult {
   tasks: Array<{ id: string; description: string }>;
 }
 
+interface InteractionEvent {
+  type: string;
+  atMs: number;
+  x: number;
+  y: number;
+  note: string;
+}
+
 interface RecordingResult {
   verdict: string;
   reasoning: string;
   videoPath: string;
   outputDir: string;
+  events: InteractionEvent[];
 }
 
 async function createSandbox(apiKey: string): Promise<{ daytona: Daytona; sandbox: Sandbox }> {
@@ -236,11 +245,22 @@ async function recordVideo(
   const videoPath = getLine("VIDEO");
   const outputDir = getLine("OUTPUT_DIR");
 
+  // Parse interaction events from EVENTS_JSON line
+  let events: InteractionEvent[] = [];
+  const eventsMatch = output.match(/^EVENTS_JSON:\s*(.+)$/m);
+  if (eventsMatch?.[1]) {
+    try {
+      events = JSON.parse(eventsMatch[1]) as InteractionEvent[];
+    } catch {
+      console.log("[recordVideo] failed to parse EVENTS_JSON, ignoring");
+    }
+  }
+
   if (!videoPath || videoPath === "not found") {
     throw new Error(`Demo recorder did not produce a video.\nOutput:\n${output}`);
   }
 
-  return { verdict, reasoning, videoPath, outputDir };
+  return { verdict, reasoning, videoPath, outputDir, events };
 }
 
 async function uploadVideoFromSandbox(sandbox: Sandbox, videoPath: string, uploadUrl: string): Promise<string> {
@@ -375,6 +395,14 @@ async function runPipeline(msg: PrPipelineMessage, env: Env): Promise<void> {
             `\n### 🎬 Demo Video\n\n` +
             `<video src="${videoUrl}" controls muted autoplay loop width="640"></video>\n\n` +
             `[Download video](${videoUrl})`,
+          );
+        }
+
+        // Include interaction events in comment for debugging/postprocessing
+        if (recording.events.length > 0) {
+          await updateComment(
+            `\n<details><summary>Interaction Events (${recording.events.length})</summary>\n\n` +
+            `\`\`\`json\n${JSON.stringify(recording.events, null, 2)}\n\`\`\`\n\n</details>`,
           );
         }
 
