@@ -398,3 +398,33 @@
   - Heredoc with `ISSUE_EOF` delimiter avoids conflicts with backticks in markdown code blocks
   - The main gap in Aura is the orchestration layer — all modules work individually but aren't connected end-to-end
 ---
+## 2026-02-28 - Post-Processing Server
+- Built complete TypeScript post-processing server for cinematic video effects
+- Implemented POST /postprocess endpoint in webhook server for video processing requests
+- Created `packages/core/src/postprocess.ts` with full pipeline: download → process → upload
+- Added FFmpeg-based cinematic effects: dynamic zoom pulses (1.28x peak), smooth focus transitions, dark padding
+- Normalized annotation sections from raw inputs with intelligent defaults and coordinate conversion
+- Generated VTT subtitle format for accessibility and timeline visualization
+- Added `updateAnnotations` Convex mutation and `annotationSections`/`subtitlesVtt` schema fields
+- Created comprehensive test suite: 9 new tests for postprocess module (132 total tests passing)
+- Files changed:
+  - `packages/core/src/postprocess.ts` (new, 358 lines)
+  - `packages/core/src/postprocess.test.ts` (new, 9 tests)
+  - `apps/webhook/src/server.ts` (added /postprocess endpoint)
+  - `apps/web/convex/runs.ts` (added updateAnnotations mutation)
+  - `apps/web/convex/schema.ts` (added annotationSections and subtitlesVtt fields)
+  - `packages/core/src/convex-uploader.ts` (added updateRunAnnotations function)
+  - `packages/core/src/index.ts` (exported new postprocess APIs)
+  - `package-lock.json`, `packages/core/package.json` (added vitest)
+- **Learnings for future iterations:**
+  - FFmpeg `filter_complex` expressions can be written to temp files via `-filter_complex_script` to avoid shell escaping issues
+  - Use `color=c=#10172A` filter to create solid background canvas for cinematic padding
+  - Zoom filter uses conditional `if(between(t,start,end),...)` expressions with nested max() for multiple pulses
+  - Focus tracking via time-based `if(gte(t,timestamp),coord,fallback)` cascades for smooth transitions
+  - VTT timestamp format requires `HH:MM:SS.mmm` with zero-padding (use String.padStart)
+  - Normalized coordinates (0..1) convert to pixels via `Math.round(norm * dimension)` for precision
+  - Section normalization should clamp coordinates to video bounds and sort by startMs for timeline consistency
+  - Always use `-movflags +faststart` for web-playable MP4s (moves moov atom to start)
+  - Temp directory cleanup in finally{} blocks ensures no leaked files even on errors
+  - Pre-signed URL downloads should check res.ok and use Buffer.from(await res.arrayBuffer()) for binary data
+---
