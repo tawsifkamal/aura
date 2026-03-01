@@ -119,6 +119,73 @@ export function revertEdits(runId: string): Promise<EditVersion> {
   return apiFetch(`/api/runs/${runId}/edits/revert`, { method: "POST" });
 }
 
+// --- Repositories ---
+
+export interface Repository {
+  id: number;
+  full_name: string;
+  name: string;
+  owner: string;
+  private: boolean;
+  html_url: string;
+  default_branch: string;
+  description: string | null;
+  language: string | null;
+  updated_at: string;
+  enabled: boolean;
+}
+
+export interface EnabledRepo {
+  _id: string;
+  userId: string;
+  githubRepoId: number;
+  fullName: string;
+  name: string;
+  owner: string;
+  isPrivate: boolean;
+  htmlUrl: string;
+  defaultBranch: string;
+  status: "available" | "added" | "synced";
+  addedAt?: number;
+  lastSyncedAt?: number;
+}
+
+export function listRepositories(q?: string): Promise<Repository[]> {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  const qs = params.toString();
+  return apiFetch(`/api/repositories${qs ? `?${qs}` : ""}`);
+}
+
+export function listEnabledRepositories(): Promise<EnabledRepo[]> {
+  return apiFetch("/api/repositories/enabled");
+}
+
+export function enableRepository(
+  githubRepoId: number,
+  repo: {
+    full_name: string;
+    name: string;
+    owner: string;
+    private: boolean;
+    html_url: string;
+    default_branch: string;
+  },
+): Promise<{ success: boolean; repository: EnabledRepo }> {
+  return apiFetch(`/api/repositories/${githubRepoId}/enable`, {
+    method: "POST",
+    body: JSON.stringify(repo),
+  });
+}
+
+export function disableRepository(
+  githubRepoId: number,
+): Promise<{ success: boolean }> {
+  return apiFetch(`/api/repositories/${githubRepoId}/disable`, {
+    method: "POST",
+  });
+}
+
 // --- Exports ---
 
 export function listExports(runId: string): Promise<ExportJob[]> {
