@@ -29,7 +29,7 @@
         "Use code diffs as context to determine which frontend surfaces the browser agent should navigate to"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Focus on React/Next.js apps first"
     },
     {

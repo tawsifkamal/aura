@@ -4,6 +4,8 @@
 - Existing Python demo-recorder in `packages/demo-recorder/` — PRD requires TypeScript-only for core flow
 - Project uses npm (not yarn/pnpm), see `package-lock.json`
 - Quality checks: `turbo run build`, `turbo run lint`, `turbo run check-types`
+- New Node.js packages: extend `@repo/typescript-config/base.json`, add `eslint.config.js` with `@repo/eslint-config/base`, set `type: "module"`
+- Core utilities live in `packages/core/src/` — import with `@repo/core` or `@repo/core/<module>`
 
 ---
 
@@ -18,4 +20,20 @@
   - The skill appears in the available skills list immediately after file creation
   - Existing `packages/plugin/skills/record-demo/SKILL.md` is the old Python-based version; the new `.claude/commands/record-demo.md` supersedes it
   - PRD says `~/.claude/commands/` (home dir) but project-level `.claude/commands/` is correct for project-scoped skills
+---
+
+## 2026-02-28 - US-002
+- Created `@repo/core` package at `packages/core/` with TypeScript utilities
+- `diff-analyzer.ts`: parses `git diff --name-status`, classifies files as component/page/route, deduplicates
+- `web-app-detector.ts`: reads `package.json`, detects framework (Next.js, React, Vue, Vite, Angular, Svelte, Nuxt, Remix, Astro), finds dev script and port
+- `route-inferrer.ts`: infers affected routes from changed file paths with confidence levels (high/medium/low), supports Next.js App Router, Pages Router, and generic patterns
+- `index.ts`: re-exports all public APIs and types
+- Updated `.claude/commands/record-demo.md` skill with detailed Step 1 instructions for diff analysis, web app detection, and route inference
+- Files changed: `packages/core/` (new package), `.claude/commands/record-demo.md` (updated), `package-lock.json`
+- **Learnings for future iterations:**
+  - New packages need `eslint.config.js` importing from `@repo/eslint-config/base` for lint to work
+  - Use `@repo/typescript-config/base.json` (not react-library) for Node.js-only packages
+  - Package `type: "module"` and `.js` extensions in imports are required for NodeNext module resolution
+  - The `parseDiffNameStatus` function is exported separately so it can be unit-tested without git
+  - Route inference confidence levels help the browser agent prioritize which routes to visit
 ---
