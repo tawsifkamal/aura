@@ -26,12 +26,7 @@
     "COMPOSIO_BASE_URL",
     "GITHUB_WEBHOOK_SECRET",
     "DASHBOARD_BASE_URL",
-    "PORT",
-    "BETTER_AUTH_SECRET",
-    "SITE_URL",
-    "NEXT_PUBLIC_CONVEX_SITE_URL",
-    "NEXT_PUBLIC_SITE_URL",
-    "NEXT_PUBLIC_CONVEX_URL"
+    "PORT"
   ],
   "tasks": {
     "build": {

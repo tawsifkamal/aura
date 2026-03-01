@@ -12,10 +12,8 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
 });
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
-  title: "Glimpse",
+  title: "Aura",
   description: "Demo video recordings for your frontend changes",
 };
 

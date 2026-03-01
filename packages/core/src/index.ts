@@ -78,6 +78,7 @@ export type {
 export {
   createRun,
   updateRunStatus,
+  updateRunAnnotations,
   uploadVideo,
   uploadScreenshots,
 } from "./convex-uploader.js";
@@ -85,7 +86,20 @@ export type {
   RunMetadata,
   UploadResult,
   ConvexUploaderOptions,
+  UpdateRunAnnotationsPayload,
 } from "./convex-uploader.js";
+
+export {
+  processAndUploadVideo,
+  uploadFileToPresignedUrl,
+} from "./postprocess.js";
+export type {
+  RawAnnotationSection,
+  AnnotationSection,
+  PostprocessRequest,
+  PostprocessOptions,
+  PostprocessResult,
+} from "./postprocess.js";
 
 export {
   findExistingComment,

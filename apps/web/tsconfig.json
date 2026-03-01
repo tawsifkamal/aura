@@ -15,5 +15,5 @@
     "next.config.js",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "convex/convex.config.ts", "convex/betterAuth/**", "convex/auth.config.ts"]
+  "exclude": ["node_modules"]
 }

@@ -25,24 +25,6 @@
   font-family: var(--font-geist-mono), monospace;
 }
 
-.signOutButton {
-  font-size: 11px;
-  font-family: var(--font-geist-mono), monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.signOutButton:hover {
-  color: var(--foreground);
-  border-color: var(--foreground);
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
