@@ -10,9 +10,10 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as edits from "../edits.js";
 import type * as runs from "../runs.js";
 
-declare const fullApi: ApiFromModules<{ runs: typeof runs }>;
+declare const fullApi: ApiFromModules<{ edits: typeof edits; runs: typeof runs }>;
 
 export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "public">>;
 export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, "internal">>;

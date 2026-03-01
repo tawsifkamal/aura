@@ -26,4 +26,22 @@ export default defineSchema({
     .index("by_timestamp", ["timestamp"])
     .index("by_status", ["status"])
     .index("by_branch", ["branch"]),
+
+  editVersions: defineTable({
+    runId: v.id("runs"),
+    version: v.number(),
+    parentVersionId: v.union(v.id("editVersions"), v.null()),
+    operations: v.array(v.any()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    videoStorageId: v.optional(v.id("_storage")),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["runId"])
+    .index("by_status", ["status"]),
 });

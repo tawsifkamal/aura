@@ -66,7 +66,24 @@ export default function RunDetailPage(props: {
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Recording {run._id.slice(-6)}</h1>
-          <span className={styles.badge}>{run.status}</span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {run.status === "completed" ? (
+              <Link
+                href={`/runs/${run._id}/edit`}
+                style={{
+                  fontSize: "12px",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  padding: "3px 8px",
+                  border: "1px solid var(--border-strong)",
+                  textTransform: "uppercase" as const,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Edit
+              </Link>
+            ) : null}
+            <span className={styles.badge}>{run.status}</span>
+          </div>
         </div>
         <div className={styles.metaGrid}>
           <div className={styles.metaItem}>
