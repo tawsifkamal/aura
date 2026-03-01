@@ -265,7 +265,7 @@
         "Webhook server is deployable as a standalone service (e.g., Node.js on Fly.io, Railway, or AWS)"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": "This is the backbone of the PR automation flow. US-009 depends on this for the actual trigger mechanism"
     },
     {
