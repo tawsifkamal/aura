@@ -66,6 +66,11 @@ def main() -> None:
         default=None,
         help="Convex deployment URL to upload video (e.g. https://hardy-salmon-997.convex.cloud)",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run browser in headless mode (required for containers/CI)",
+    )
     args = parser.parse_args()
 
     # Parse tasks JSON
@@ -88,6 +93,7 @@ def main() -> None:
             max_steps=args.max_steps,
             model=args.model,
             convex_url=args.convex_url,
+            headless=args.headless,
         )
     )
 

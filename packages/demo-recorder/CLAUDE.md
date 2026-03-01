@@ -49,8 +49,11 @@ python -m demo_recorder.cli \
 **Arguments:**
 - `--tasks` (required): JSON array string of tasks
 - `--base-url` (default: `http://localhost:3000`): App base URL
+- `--headless` (required for containers/CI): Run browser without display
 - `--max-steps` (optional): Max agent steps
 - `--output-dir` (optional): Override output directory
+
+**IMPORTANT:** Always use `--headless` when running in containers, CI, or any environment without a display (e.g., Daytona sandbox, Docker, GitHub Actions).
 
 ### 3. Parse Output
 
@@ -84,12 +87,18 @@ OUTPUT_DIR: /path/to/demos/2026-03-01-120000
 
 User says: "Test the login page at /login with admin/password123"
 
-You run:
+**Local (with display):**
 ```bash
-cd /Users/macbookpro/Documents/projects/aura/packages/demo-recorder && \
 python -m demo_recorder.cli --tasks '[
   {"id":"login-success","description":"Navigate to /login. Type admin into the field with id=username and password123 into the field with id=password. Click the button with id=sign-in-button. Confirm the element with id=success-banner is visible."}
 ]' --base-url http://localhost:3000
+```
+
+**Container/CI (headless):**
+```bash
+python -m demo_recorder.cli --tasks '[
+  {"id":"login-success","description":"Navigate to /login. Type admin into id=username and password123 into id=password. Click id=sign-in-button. Confirm id=success-banner is visible."}
+]' --base-url http://localhost:3000 --headless
 ```
 
 Then report the VERDICT and VIDEO path to the user.
