@@ -5,12 +5,17 @@ export const AURA_WORKFLOW_YAML = `name: Aura PR Notification
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
 
 jobs:
   notify-aura:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.base.ref == github.event.repository.default_branch
+    if: |
+      (github.event_name == 'pull_request' && github.event.action == 'ready_for_review' && github.event.pull_request.base.ref == github.event.repository.default_branch) ||
+      (github.event_name == 'pull_request' && github.event.action == 'opened' && !github.event.pull_request.draft && github.event.pull_request.base.ref == github.event.repository.default_branch) ||
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && github.event.pull_request.base.ref == github.event.repository.default_branch)
     steps:
       - name: Notify Aura
         run: |

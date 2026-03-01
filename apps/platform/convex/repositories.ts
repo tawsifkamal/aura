@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./auth";
 
 // List all repositories for a user
 export const listByUser = query({
-  args: { userId: v.id("users") },
+  args: { userId: v.id("users"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db
       .query("repositories")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -21,8 +23,10 @@ export const listByUserAndStatus = query({
       v.literal("added"),
       v.literal("synced"),
     ),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const all = await ctx.db
       .query("repositories")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -47,8 +51,10 @@ export const upsertFromGitHub = mutation({
         defaultBranch: v.string(),
       }),
     ),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     // Get existing repos for this user
     const existing = await ctx.db
       .query("repositories")
@@ -98,8 +104,10 @@ export const updateStatus = mutation({
       v.literal("added"),
       v.literal("synced"),
     ),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const now = Date.now();
     const patch: Record<string, unknown> = { status: args.status };
     if (args.status === "added" || args.status === "synced") {
@@ -114,8 +122,9 @@ export const updateStatus = mutation({
 
 // Get a single repository
 export const get = query({
-  args: { id: v.id("repositories") },
+  args: { id: v.id("repositories"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db.get(args.id);
   },
 });
@@ -125,8 +134,10 @@ export const getByUserAndGithubId = query({
   args: {
     userId: v.id("users"),
     githubRepoId: v.number(),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db
       .query("repositories")
       .withIndex("by_user_and_github_id", (q) =>
@@ -148,8 +159,10 @@ export const updateSetupStatus = mutation({
     setupPrUrl: v.optional(v.string()),
     setupPrNumber: v.optional(v.number()),
     setupError: v.optional(v.string()),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const patch: Record<string, unknown> = { setupStatus: args.setupStatus };
     if (args.setupPrUrl !== undefined) patch.setupPrUrl = args.setupPrUrl;
     if (args.setupPrNumber !== undefined) patch.setupPrNumber = args.setupPrNumber;
@@ -160,8 +173,9 @@ export const updateSetupStatus = mutation({
 
 // Remove a repository (when user disables it)
 export const remove = mutation({
-  args: { id: v.id("repositories") },
+  args: { id: v.id("repositories"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     await ctx.db.delete(args.id);
   },
 });

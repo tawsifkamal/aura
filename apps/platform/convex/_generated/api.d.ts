@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
 import type * as edits from "../edits.js";
 import type * as exports from "../exports.js";
 import type * as repositories from "../repositories.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   edits: typeof edits;
   exports: typeof exports;
   repositories: typeof repositories;

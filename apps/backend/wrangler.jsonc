@@ -11,6 +11,11 @@
     "enabled": true,
   },
   "compatibility_flags": ["nodejs_compat"],
+  "queues": {
+    "producers": [
+      { "binding": "PR_PIPELINE_QUEUE", "queue": "aura-queue" }
+    ]
+  },
   /**
    * Smart Placement
    * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

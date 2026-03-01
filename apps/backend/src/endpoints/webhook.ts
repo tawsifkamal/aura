@@ -1,7 +1,5 @@
 import { Hono } from "hono";
 import type { ConvexClient } from "../convex";
-import { createPrComment, updatePrComment, getPrDiff } from "../github";
-import { createSandbox, cloneRepo, writeDiffFile, analyzeChanges, runSetup, waitForServer, recordVideo, uploadVideoFromSandbox, destroySandbox } from "../daytona";
 
 export const webhooks = new Hono<{
   Bindings: Env;
@@ -76,175 +74,23 @@ webhooks.post("/pr", async (c) => {
     `[webhook/pr] user=${user.githubLogin} repo=${body.repository_id} branch=${body.branch} base=${body.base_branch ?? repo.defaultBranch} pr=${body.pr_number ?? "none"} sha=${body.commit_sha ?? "none"}`,
   );
 
-  // If there's a PR number, kick off the async pipeline
+  // If there's a PR number, enqueue the pipeline job
   if (body.pr_number) {
-    const prNumber = body.pr_number;
-    const branch = body.branch;
-    const accessToken = user.accessToken;
-    const owner = repo.owner;
-    const repoName = repo.name;
-    const isPrivate = repo.isPrivate;
-    const daytonaApiKey = c.env.DAYTONA_API_KEY;
-    const groqApiKey = c.env.GROQ_API_KEY;
-    const browserUseApiKey = c.env.BROWSER_USE_API_KEY;
+    await c.env.PR_PIPELINE_QUEUE.send({
+      accessToken: user.accessToken,
+      owner: repo.owner,
+      repoName: repo.name,
+      prNumber: body.pr_number,
+      branch: body.branch,
+      isPrivate: repo.isPrivate,
+    });
 
-    const log = (step: string, detail?: string) => {
-      console.log(`[webhook/pr] [${owner}/${repoName}#${prNumber}] ${step}${detail ? `: ${detail}` : ""}`);
-    };
-
-    const pipeline = async () => {
-      let commentId: number | undefined;
-      let commentBody = "";
-
-      const updateComment = async (line: string) => {
-        commentBody += (commentBody ? "\n" : "") + line;
-        if (commentId) {
-          await updatePrComment(accessToken, owner, repoName, commentId, commentBody);
-        }
-      };
-
-      try {
-        // Step 1: Post initial PR comment
-        log("step 1", "posting initial comment");
-        commentBody = "🔄 **Aura** is analyzing this pull request...";
-        const comment = await createPrComment(
-          accessToken,
-          owner,
-          repoName,
-          prNumber,
-          commentBody,
-        );
-        commentId = comment.id;
-
-        // Step 2: Fetch PR diff via GitHub API (fast, no clone needed)
-        log("step 2", "fetching PR diff");
-        const diff = await getPrDiff(accessToken, owner, repoName, prNumber);
-        log("step 2", `diff fetched (${diff.length} chars)`);
-        await updateComment("📋 Fetched PR diff.");
-
-        // Step 3: Create Daytona sandbox (no env vars — secrets passed per-command)
-        log("step 3", "creating sandbox");
-        const { daytona, sandbox } = await createSandbox(daytonaApiKey);
-        log("step 3", `sandbox created: ${sandbox.id}`);
-
-        try {
-          // Step 4: Sandbox ready, cloning
-          await updateComment("⏳ Sandbox ready. Cloning repository...");
-
-          // Clone repo (use token for private repos)
-          const cloneUrl = isPrivate
-            ? `https://x-access-token:${accessToken}@github.com/${owner}/${repoName}.git`
-            : `https://github.com/${owner}/${repoName}.git`;
-
-          log("step 4", `cloning ${owner}/${repoName} branch=${branch}`);
-          await cloneRepo(sandbox, cloneUrl, branch);
-          log("step 4", "clone done");
-
-          // Step 5: Write pre-fetched diff into the repo
-          await writeDiffFile(sandbox, diff);
-          await updateComment("🔍 Repository cloned. Analyzing PR changes...");
-
-          // Step 6: Run OpenCode to analyze the diff and generate testing steps
-          log("step 6", "running OpenCode analysis");
-          const analysis = await analyzeChanges(sandbox, groqApiKey);
-          log("step 6", `analysis done: has_ui_changes=${analysis.has_ui_changes}, tasks=${analysis.tasks.length}`);
-
-          // Step 7: Analysis complete
-          if (analysis.has_ui_changes) {
-            const taskList = analysis.tasks
-              .map((t, i) => `${i + 1}. ${t.description}`)
-              .join("\n");
-            await updateComment(
-              `✅ Analysis complete.\n\n` +
-              `**Base URL:** \`${analysis.base_url}\`\n\n` +
-              `**Setup:**\n\`\`\`bash\n${analysis.setup.join("\n")}\n\`\`\`\n\n` +
-              `**Testing steps:**\n${taskList}`
-            );
-
-            // Step 8: Run setup commands (last one starts dev server in background)
-            log("step 8", `running setup: ${analysis.setup.join(" && ")}`);
-            await updateComment("⏳ Setting up project...");
-            await runSetup(sandbox, analysis.setup);
-            log("step 8", "setup done, dev server backgrounded");
-
-            // Step 9: Wait for dev server to be reachable
-            log("step 9", `waiting for server at ${analysis.base_url}`);
-            await waitForServer(sandbox, analysis.base_url, 60);
-            log("step 9", "server is up");
-            await updateComment("✅ Dev server is running.");
-
-            // Step 10: Record browser demo video
-            log("step 10", "starting browser recording");
-            await updateComment("🎥 Recording demo video...");
-            const recording = await recordVideo(
-              sandbox,
-              analysis.tasks,
-              analysis.base_url,
-              browserUseApiKey,
-            );
-            log("step 10", `recording done: verdict=${recording.verdict}, video=${recording.videoPath}`);
-
-            const verdictIcon = recording.verdict === "pass" ? "✅" : "❌";
-            await updateComment(
-              `${verdictIcon} Recording complete — verdict: **${recording.verdict}**` +
-              (recording.reasoning ? `\n> ${recording.reasoning}` : ""),
-            );
-
-            // Step 11: Upload video to Convex storage
-            log("step 11", "uploading video");
-            await updateComment("⬆️ Uploading video...");
-            const uploadUrl = await convex.mutation<string>("runs:generateUploadUrl");
-            const storageId = await uploadVideoFromSandbox(
-              sandbox,
-              recording.videoPath,
-              uploadUrl,
-            );
-            log("step 11", `uploaded, storageId=${storageId}`);
-
-            // Step 12: Get signed download URL
-            const videoUrl = await convex.query<string | null>(
-              "runs:getStorageUrl",
-              { storageId },
-            );
-            log("step 12", `videoUrl=${videoUrl ? "obtained" : "null"}`);
-
-            if (videoUrl) {
-              await updateComment(
-                `\n### 🎬 Demo Video\n\n` +
-                `<video src="${videoUrl}" controls muted autoplay loop width="640"></video>\n\n` +
-                `[Download video](${videoUrl})`,
-              );
-            }
-
-            log("cleanup", "destroying sandbox");
-            await destroySandbox(daytona, sandbox);
-            log("done", "pipeline complete");
-          } else {
-            await updateComment("✅ Analysis complete. No UI changes detected — skipping video recording.");
-            await destroySandbox(daytona, sandbox);
-            log("done", "no UI changes, sandbox destroyed");
-          }
-        } catch (innerErr) {
-          // Cleanup sandbox on error during clone/update
-          await destroySandbox(daytona, sandbox).catch(() => {});
-          throw innerErr;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[webhook/pr] pipeline failed: ${message}`);
-
-        if (commentId) {
-          await updateComment(`❌ Something went wrong: ${message}`).catch(() => {});
-        }
-      }
-    };
-
-    c.executionCtx.waitUntil(pipeline());
+    console.log(`[webhook/pr] enqueued pipeline for ${repo.owner}/${repo.name}#${body.pr_number}`);
   }
 
   return c.json({
     success: true,
-    message: "PR webhook received",
+    message: "PR pipeline queued",
     user: user.githubLogin,
     repository_id: body.repository_id,
     branch: body.branch,

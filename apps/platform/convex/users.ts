@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./auth";
 
 export const upsert = mutation({
   args: {
+    adminSecret: v.string(),
     githubUserId: v.number(),
     githubLogin: v.string(),
     accessToken: v.string(),
@@ -23,6 +25,7 @@ export const upsert = mutation({
     connectedAt: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const existing = await ctx.db
       .query("users")
       .withIndex("by_github_user_id", (q) =>
@@ -43,13 +46,15 @@ export const upsert = mutation({
       return existing._id;
     }
 
-    return ctx.db.insert("users", args);
+    const { adminSecret, ...data } = args;
+    return ctx.db.insert("users", data);
   },
 });
 
 export const getByApiKey = query({
-  args: { apiKey: v.string() },
+  args: { adminSecret: v.string(), apiKey: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db
       .query("users")
       .withIndex("by_api_key", (q) => q.eq("apiKey", args.apiKey))
@@ -58,8 +63,9 @@ export const getByApiKey = query({
 });
 
 export const getByGithubId = query({
-  args: { githubUserId: v.number() },
+  args: { adminSecret: v.string(), githubUserId: v.number() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db
       .query("users")
       .withIndex("by_github_user_id", (q) =>

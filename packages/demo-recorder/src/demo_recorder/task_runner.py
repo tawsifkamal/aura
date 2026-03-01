@@ -21,7 +21,7 @@ from pathlib import Path
 from datetime import datetime
 
 import httpx
-from browser_use import Agent, Browser
+from browser_use import Agent, Browser, BrowserProfile
 
 from .recorder import get_llm
 
@@ -229,10 +229,12 @@ async def run_tasks(
     print("-" * 60 + "\n")
 
     try:
-        browser_session = Browser(
+        browser_profile = BrowserProfile(
             headless=headless,
             record_video_dir=str(output_dir),
             record_video_size={"width": 1920, "height": 1080},
+            wait_between_actions=1.5,
+            minimum_wait_page_load_time=1.0,
         )
 
         llm = get_llm(model)
@@ -252,10 +254,8 @@ async def run_tasks(
         agent = Agent(
             task=prompt,
             llm=llm,
-            browser=browser_session,
+            browser_profile=browser_profile,
             ground_truth=ground_truth,
-            # Explicit initial navigation — bypasses directly_open_url regex
-            # (which silently bails when >1 unique URL is found in the prompt)
         )
 
         # agent.run() auto-closes the browser session internally (await self.close() in its own finally block)

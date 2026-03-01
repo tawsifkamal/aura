@@ -194,7 +194,7 @@ export class GitHubCallback extends OpenAPIRoute {
     };
 
     // Store credentials in Convex
-    const convex = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_DEPLOY_KEY);
+    const convex = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_ADMIN_SECRET);
 
     // Check if user already has an API key; generate one if not
     const existingUser = await convex.query<{ apiKey?: string } | null>(

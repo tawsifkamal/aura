@@ -5,18 +5,18 @@
  *   POST <CONVEX_URL>/api/query   { path, args, format: "json" }
  *   POST <CONVEX_URL>/api/mutation { path, args, format: "json" }
  *
- * Auth: "Authorization: Convex <deploy_key>" when CONVEX_DEPLOY_KEY is set.
- * Local dev (no key) omits the header — Convex dev server doesn't require auth.
+ * Auth: When adminSecret is provided, it is injected into every call's args
+ * so that Convex functions can verify the caller is an admin.
  */
 
 export class ConvexClient {
   private baseUrl: string;
-  private deployKey: string | undefined;
+  private adminSecret: string | undefined;
 
-  constructor(url: string, deployKey?: string) {
+  constructor(url: string, adminSecret?: string) {
     // Strip trailing slash
     this.baseUrl = url.replace(/\/+$/, "");
-    this.deployKey = deployKey || undefined;
+    this.adminSecret = adminSecret || undefined;
   }
 
   async query<T = unknown>(path: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -33,14 +33,13 @@ export class ConvexClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.deployKey) {
-      headers["Authorization"] = `Convex ${this.deployKey}`;
-    }
+
+    const argsWithAuth = this.adminSecret ? { ...args, adminSecret: this.adminSecret } : args;
 
     const res = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ path, args, format: "json" }),
+      body: JSON.stringify({ path, args: argsWithAuth, format: "json" }),
     });
 
     if (!res.ok) {

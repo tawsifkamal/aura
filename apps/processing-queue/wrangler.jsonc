@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "aura-processing-queue",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-03-01",
+	"observability": {
+		"enabled": true
+	},
+	"queues": {
+		"consumers": [
+			{
+				"queue": "aura-queue",
+				"max_batch_size": 1,
+				"max_retries": 2
+			}
+		]
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	]
+}

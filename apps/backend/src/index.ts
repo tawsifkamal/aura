@@ -33,7 +33,7 @@ app.use(
 
 // Convex client middleware — inject on all /api/* routes
 app.use("/api/*", async (c, next) => {
-  const client = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_DEPLOY_KEY);
+  const client = new ConvexClient(c.env.CONVEX_URL, c.env.CONVEX_ADMIN_SECRET);
   c.set("convex", client);
   await next();
 });

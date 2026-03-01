@@ -1,6 +1,7 @@
 import type { Value } from "convex/values";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./auth";
 
 const editOperationValidator = v.union(
   v.object({
@@ -52,8 +53,9 @@ const editOperationValidator = v.union(
 );
 
 export const listVersions = query({
-  args: { runId: v.id("runs") },
+  args: { runId: v.id("runs"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const versions = await ctx.db
       .query("editVersions")
       .withIndex("by_run", (q) => q.eq("runId", args.runId))
@@ -72,8 +74,9 @@ export const listVersions = query({
 });
 
 export const getVersion = query({
-  args: { id: v.id("editVersions") },
+  args: { id: v.id("editVersions"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const ver = await ctx.db.get(args.id);
     if (!ver) return null;
 
@@ -89,8 +92,10 @@ export const applyEdit = mutation({
     runId: v.id("runs"),
     parentVersionId: v.optional(v.id("editVersions")),
     operation: editOperationValidator,
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const run = await ctx.db.get(args.runId);
     if (!run) throw new Error("Run not found");
 
@@ -124,8 +129,9 @@ export const applyEdit = mutation({
 });
 
 export const revert = mutation({
-  args: { runId: v.id("runs") },
+  args: { runId: v.id("runs"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db.insert("editVersions", {
       runId: args.runId,
       version: 0,
@@ -148,8 +154,10 @@ export const updateVersionStatus = mutation({
     ),
     videoStorageId: v.optional(v.id("_storage")),
     error: v.optional(v.string()),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const { id, status, videoStorageId, error } = args;
     await ctx.db.patch(id, {
       status,

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./auth";
 
 export const create = mutation({
   args: {
@@ -15,8 +16,10 @@ export const create = mutation({
       v.literal("preview"),
     ),
     maxFileSizeMb: v.optional(v.number()),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     return ctx.db.insert("exportJobs", {
       ...args,
       status: "queued" as const,
@@ -27,8 +30,9 @@ export const create = mutation({
 });
 
 export const list = query({
-  args: { runId: v.id("runs") },
+  args: { runId: v.id("runs"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const jobs = await ctx.db
       .query("exportJobs")
       .withIndex("by_run", (q) => q.eq("runId", args.runId))
@@ -47,8 +51,9 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("exportJobs") },
+  args: { id: v.id("exportJobs"), adminSecret: v.string() },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const job = await ctx.db.get(args.id);
     if (!job) return null;
 
@@ -72,8 +77,10 @@ export const updateProgress = mutation({
       ),
     ),
     eta: v.optional(v.string()),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     const { id, ...fields } = args;
     await ctx.db.patch(id, fields);
   },
@@ -84,8 +91,10 @@ export const complete = mutation({
     id: v.id("exportJobs"),
     outputStorageId: v.id("_storage"),
     fileSizeBytes: v.number(),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     await ctx.db.patch(args.id, {
       status: "completed" as const,
       progress: 100,
@@ -100,8 +109,10 @@ export const fail = mutation({
   args: {
     id: v.id("exportJobs"),
     error: v.string(),
+    adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    requireAdmin(args.adminSecret);
     await ctx.db.patch(args.id, {
       status: "failed" as const,
       error: args.error,

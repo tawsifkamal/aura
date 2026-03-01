@@ -75,10 +75,23 @@ export async function analyzeChanges(
 export async function runSetup(
   sandbox: Sandbox,
   commands: string[],
+  baseUrl: string,
 ): Promise<void> {
   if (commands.length === 0) return;
 
   const cwd = "/home/daytona/repo";
+
+  // Extract port from base_url and kill any existing process on it
+  const portMatch = baseUrl.match(/:(\d+)/);
+  if (portMatch) {
+    const port = portMatch[1];
+    await sandbox.process.executeCommand(
+      `fuser -k ${port}/tcp 2>/dev/null || true`,
+      undefined,
+      undefined,
+      10,
+    );
+  }
 
   // Run all commands except the last one synchronously
   for (let i = 0; i < commands.length - 1; i++) {
