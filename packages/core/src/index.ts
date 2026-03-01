@@ -100,3 +100,19 @@ export type {
   PRBotOptions,
   CommentState,
 } from "./pr-bot.js";
+
+export {
+  buildSandboxConfig,
+  createSandbox,
+  runInSandbox,
+  exportArtifact,
+  destroySandbox,
+  runPipeline,
+  buildRecordingPipelineSteps,
+} from "./sandbox.js";
+export type {
+  SandboxConfig,
+  SandboxHandle,
+  PipelineRunOptions,
+  PipelineResult,
+} from "./sandbox.js";
