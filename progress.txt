@@ -55,3 +55,22 @@
   - Always check if port is already in use before spawning — avoids double-server issues
   - `detached: true` with `stdio: ["ignore", "pipe", "pipe"]` prevents zombie processes
 ---
+
+## 2026-02-28 - US-004
+- Created `browser-recorder.ts` in `packages/core/src/` with recording session orchestration
+- `createSession()`: initializes recording session with ID, routes, output dir
+- `createOutputDir()`: creates `demos/[timestamp]/screenshots/` structure
+- `addStep()`: logs actions (navigate, click, type, screenshot) with timestamps
+- `buildNavigationScript()`: converts InferredRoute[] to full URL list
+- `writeSummary()`: generates `summary.md` with routes, steps, and diff context
+- `buildLaminarMetadata()`: prepares Laminar tracing config for browser-use runs
+- `buildSupermemoryQuery()`: prepares Supermemory context retrieval query
+- Updated skill prompt Step 3 with detailed browser-use + Playwright instructions
+- Files changed: `packages/core/src/browser-recorder.ts` (new), `packages/core/src/index.ts` (updated), `.claude/commands/record-demo.md` (updated)
+- **Learnings for future iterations:**
+  - browser-use npm package is built on Playwright — use Playwright directly for screenshots/video recording
+  - Playwright `recordVideo: { dir, size }` in context options auto-saves video on context close
+  - browser-use Agent takes `{ task, llm }` — configure with routes and diff context as the task description
+  - Laminar and Supermemory are optional integrations — gate on env vars (LAMINAR_ENDPOINT, SUPERMEMORY_ENDPOINT)
+  - Session ID format YYYYMMDD-HHMMSS doubles as the demos/ subfolder name
+---

@@ -60,7 +60,7 @@
         "Save output to demos/ folder with timestamp"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Relies on browser-use agent and browser tooling being configured"
     },
     {
