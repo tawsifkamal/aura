@@ -140,7 +140,7 @@
         "Final comment includes summary of tested frontend areas inferred from diff"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Avoid comment spam by continuously editing one canonical bot comment"
     },
     {

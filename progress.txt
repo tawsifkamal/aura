@@ -12,6 +12,7 @@
 - Exclude `convex/_generated/**` in ESLint config to avoid lint errors on auto-generated files
 - Dashboard UI at `apps/web/` — strict B&W theme, sharp edges, CSS Modules, responsive grid
 - Upload utility in `packages/core/src/convex-uploader.ts` — uses Convex HTTP API for uploads from CLI/pipeline
+- PR bot in `packages/core/src/pr-bot.ts` — single persistent comment with `<!-- aura-bot -->` marker, status lifecycle
 
 ---
 
@@ -148,4 +149,20 @@
 - **Learnings for future iterations:**
   - The skill prompt is the single source of truth for Claude's response format — be explicit about what must appear
   - `dashboardUrl` from `createRun()` already contains the full specific-run URL — no need to construct it separately
+---
+
+## 2026-02-28 - US-009
+- Created `pr-bot.ts` in `packages/core/src/` for GitHub PR comment lifecycle management
+- `findExistingComment()`: searches PR comments for the `<!-- aura-bot -->` marker to find the canonical bot comment
+- `postOrUpdateComment()`: creates or edits the single persistent comment (avoids comment spam)
+- `updateCommentStatus()`: transitions comment through status lifecycle (queued → running → uploading → completed/failed)
+- `buildCommentBody()`: renders markdown comment body with status, video preview, dashboard link, summary, and routes tested
+- Comment body uses a hidden HTML marker (`<!-- aura-bot -->`) for identification
+- Status-specific rendering: queued/running show spinner text, completed shows video + dashboard link + summary, failed shows error
+- Files changed: `packages/core/src/pr-bot.ts` (new), `packages/core/src/index.ts` (updated)
+- **Learnings for future iterations:**
+  - GitHub API uses `issues/comments` endpoint for PR comments (PRs are issues)
+  - Hidden HTML comments (`<!-- marker -->`) are the standard pattern for bot comment identification
+  - Always use `per_page=100` when searching for existing comments to avoid pagination issues on busy PRs
+  - The `X-GitHub-Api-Version` header is recommended for API stability
 ---
