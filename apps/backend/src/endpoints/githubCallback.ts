@@ -231,10 +231,25 @@ export class GitHubCallback extends OpenAPIRoute {
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
 
-    // Redirect to frontend if a `redirect_to` query param matches an allowed origin
+    // Extract redirect_to from the OAuth state param (encoded during /api/auth/github)
+    const stateParam = data.query.state;
+    let redirectTo: string | null = null;
+    if (stateParam) {
+      try {
+        const decoded = JSON.parse(atob(stateParam)) as { redirect_to?: string };
+        if (decoded.redirect_to) redirectTo = decoded.redirect_to;
+      } catch {
+        // State was a plain UUID (no redirect encoded) — ignore
+      }
+    }
+
+    // Also check query param as fallback
     const url = new URL(c.req.url);
-    const redirectTo = url.searchParams.get("redirect_to");
-    if (redirectTo && ALLOWED_ORIGINS.some((o) => redirectTo.startsWith(o))) {
+    if (!redirectTo) {
+      redirectTo = url.searchParams.get("redirect_to");
+    }
+
+    if (redirectTo && ALLOWED_ORIGINS.some((o) => redirectTo!.startsWith(o))) {
       return c.redirect(redirectTo, 302);
     }
 

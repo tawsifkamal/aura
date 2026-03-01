@@ -39,7 +39,14 @@ export class GitHubAuthRedirect extends OpenAPIRoute {
       );
     }
 
-    const state = crypto.randomUUID();
+    const url = new URL(c.req.url);
+    const redirectTo = url.searchParams.get("redirect_to");
+
+    // Encode redirect_to in state so it survives the OAuth round-trip
+    const nonce = crypto.randomUUID();
+    const state = redirectTo
+      ? btoa(JSON.stringify({ nonce, redirect_to: redirectTo }))
+      : nonce;
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -50,7 +57,6 @@ export class GitHubAuthRedirect extends OpenAPIRoute {
 
     const authorizationUrl = `${GITHUB_AUTHORIZE_URL}?${params.toString()}`;
 
-    const url = new URL(c.req.url);
     if (url.searchParams.get("redirect") === "false") {
       return c.json({ authorization_url: authorizationUrl, state });
     }
