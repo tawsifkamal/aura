@@ -316,3 +316,20 @@
   - Discord embeds use numeric color codes (0x000000 for black)
   - Webhook channels don't need Composio OAuth — they just receive POST requests directly
 ---
+
+## 2026-02-28 - US-019
+- Created `conversational-edit.ts` in `packages/core/src/` for NLP-based video editing via channel replies
+- `parseEditRequest()`: pattern-based NLP parser handles trim, zoom, crop, split, style presets, cursor emphasis, and export requests
+- Supports natural language like "trim the first 5 seconds", "zoom in on the button click", "make it a GIF", "use dramatic style"
+- `buildEditAPICall()`: translates parsed requests into Convex mutation paths (`edits:applyEdit` or `exports:create`)
+- `executeEditRequest()`: calls editing API via Convex HTTP endpoint and returns structured reply
+- `handleEditMessage()`: full round-trip — parse, execute, reply via channel, re-deliver updated video
+- Multi-round editing supported: conversation context tracks edit history with parent version chain
+- Reply messages sent back through the originating channel only (not broadcast to all channels)
+- Files changed: `packages/core/src/conversational-edit.ts` (new), `packages/core/src/index.ts`
+- **Learnings for future iterations:**
+  - `parseMs()` heuristic: values < 300 are treated as seconds (×1000), otherwise as milliseconds
+  - Pattern order matters — more specific patterns should come before generic ones
+  - Regex match groups from `match()` can be `undefined` even within a successful match — use optional chaining `?.[1]`
+  - Re-delivery after edit uses `deliverToAllChannels()` with a filtered single-channel preferences object
+---

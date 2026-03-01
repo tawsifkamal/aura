@@ -157,6 +157,19 @@ export type {
 } from "./sandbox.js";
 
 export {
+  parseEditRequest,
+  buildEditAPICall,
+  executeEditRequest,
+  handleEditMessage,
+} from "./conversational-edit.js";
+export type {
+  EditOperationType,
+  ParsedEditRequest,
+  ConversationContext,
+  EditReply,
+} from "./conversational-edit.js";
+
+export {
   deliverToAllChannels,
   getComposioConfig,
   isComposioAvailable,
