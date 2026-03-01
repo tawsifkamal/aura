@@ -416,7 +416,7 @@ async def run_tasks(
 
         # ── Trim loading screen from start of video ──
         # Hardcoded 6.5s delay for browser-use splash screen
-        trim_offset_sec = 6.5 if use_xvfb else 0.0
+        trim_offset_sec = 7.0 if use_xvfb else 0.0
         print(f"  Trim offset: {trim_offset_sec:.2f}s")
 
         if use_xvfb and trim_offset_sec > 1.0:
