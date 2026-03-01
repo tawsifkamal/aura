@@ -13,6 +13,7 @@ import type * as edits from "../edits.js";
 import type * as exports from "../exports.js";
 import type * as http from "../http.js";
 import type * as runs from "../runs.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   exports: typeof exports;
   http: typeof http;
   runs: typeof runs;
+  users: typeof users;
 }>;
 
 /**
