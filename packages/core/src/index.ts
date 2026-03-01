@@ -102,6 +102,23 @@ export type {
 } from "./pr-bot.js";
 
 export {
+  createTrace,
+  startSpan,
+  endSpan,
+  addSpanEvent,
+  endTrace,
+  exportTrace,
+  buildTraceUrl,
+  getLaminarConfig,
+} from "./laminar.js";
+export type {
+  LaminarConfig,
+  TraceSpan,
+  TraceEvent,
+  RunTrace,
+} from "./laminar.js";
+
+export {
   buildSandboxConfig,
   createSandbox,
   runInSandbox,

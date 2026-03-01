@@ -1,6 +1,18 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "LAMINAR_ENDPOINT",
+    "LAMINAR_API_KEY",
+    "LAMINAR_PROJECT_ID",
+    "SUPERMEMORY_ENDPOINT",
+    "SUPERMEMORY_API_KEY",
+    "AGENTMAIL_API_KEY",
+    "AGENTMAIL_FROM",
+    "CONVEX_URL",
+    "CONVEX_DEPLOYMENT",
+    "GITHUB_TOKEN"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
