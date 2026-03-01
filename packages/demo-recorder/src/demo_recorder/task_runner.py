@@ -260,9 +260,11 @@ async def run_tasks(
         history = await agent.run(max_steps=max_steps)
 
         # Wait for video to finalize - ffmpeg needs time to write moov atom
+        # Longer delay in headless/container mode as video encoding can be slower
         import asyncio
-        print("  Waiting for video to finalize...")
-        await asyncio.sleep(3)
+        finalize_delay = 5 if headless else 3
+        print(f"  Waiting {finalize_delay}s for video to finalize...")
+        await asyncio.sleep(finalize_delay)
 
         # Extract judge verdict — judgement() returns verdict as bool (True=pass) or string
         judgement = history.judgement() if hasattr(history, 'judgement') else None
@@ -296,9 +298,25 @@ async def run_tasks(
                     timeout=10,
                 )
                 if probe_result.returncode == 0 and "duration" in probe_result.stdout:
+                    # Also check frame count to detect dropped frames
+                    frame_check = subprocess.run(
+                        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                         "-count_packets", "-show_entries", "stream=nb_read_packets",
+                         "-of", "csv=p=0", str(video_file)],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    frame_count = int(frame_check.stdout.strip()) if frame_check.stdout.strip().isdigit() else 0
+                    duration_match = re.search(r"duration=(\d+\.?\d*)", probe_result.stdout)
+                    duration = float(duration_match.group(1)) if duration_match else 0
+                    expected_fps = 25  # typical browser recording fps
+                    expected_frames = duration * expected_fps * 0.5  # allow 50% frame drop threshold
+
+                    if frame_count < expected_frames and duration > 2:
+                        print(f"  ⚠️ Low frame count: {frame_count} frames for {duration:.1f}s video (expected ~{int(duration * expected_fps)})")
+
                     final_video_path = video_file
                     file_size = video_file.stat().st_size
-                    print(f"  ✅ Valid video: {video_file.name} ({file_size / 1024:.1f} KB)")
+                    print(f"  ✅ Valid video: {video_file.name} ({file_size / 1024:.1f} KB, {frame_count} frames)")
                 else:
                     print(f"  ⚠️ Corrupt video (no moov atom): {video_file.name}")
             except (subprocess.TimeoutExpired, FileNotFoundError):
