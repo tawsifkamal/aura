@@ -66,13 +66,44 @@ Inferred Routes: [list of routes with confidence]
 Key Changes: [brief description of what changed in the UI]
 ```
 
-## Step 3: Start Dev Server
+## Step 2: Start Dev Server
 
-Start the development server in the background:
-1. Detect the start command from `package.json` scripts (`dev` preferred)
-2. Run it in the background
-3. Poll `localhost` on common ports (3000, 5173, 8080, 4200) until the server responds
-4. Wait for HTTP 200 before proceeding
+Use `startDevServer()` from `@repo/core/dev-server` or follow these manual steps.
+The implementation lives in `packages/core/src/dev-server.ts`.
+
+### 2a. Resolve the dev command
+
+Use the dev script detected in Step 1 (usually `npm run dev`). If no script was found, check for `start`, `serve`, or `develop` in `package.json` scripts.
+
+### 2b. Check if server is already running
+
+Before spawning a new process, check if something is already listening on the expected port:
+- Try an HTTP GET to `http://localhost:<port>`
+- If it responds (any status code), the server is already up — skip to Step 3
+
+### 2c. Start the server in background
+
+Run the dev command as a background process:
+- Use `spawn` with `detached: true` and `stdio: ["ignore", "pipe", "pipe"]`
+- Keep a reference to the child process for cleanup later
+- Set `FORCE_COLOR=0` to avoid ANSI escape codes in output
+
+### 2d. Poll until ready
+
+Poll `http://localhost:<port>` every 500ms until:
+- An HTTP response is received (any status, including redirects) — server is ready
+- Or 60 seconds have elapsed — timeout and fail
+
+**Port priority**: Use the port from Step 1 detection. If the server doesn't respond on the expected port, scan fallback ports: `3000, 5173, 8080, 4200, 4321, 8000`.
+
+### 2e. Confirm and report
+
+Once the server is ready, print:
+```
+Dev server ready at http://localhost:<port>
+```
+
+**Cleanup**: Remember to kill the server process when done recording (Step 5). Use `process.kill(-pid, 'SIGTERM')` to kill the process group.
 
 ## Step 4: Navigate and Record with browser-use
 

@@ -11,3 +11,12 @@ export type { Framework, WebAppInfo } from "./web-app-detector.js";
 
 export { inferRoutes, buildNavigationPlan } from "./route-inferrer.js";
 export type { InferredRoute } from "./route-inferrer.js";
+
+export {
+  startDevServer,
+  resolveDevCommand,
+  httpCheck,
+  waitForPort,
+  findActivePort,
+} from "./dev-server.js";
+export type { DevServerOptions, DevServerHandle } from "./dev-server.js";
