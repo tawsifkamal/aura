@@ -185,6 +185,7 @@ async def run_tasks(
     model: str = "browser-use",
     max_steps: int | None = None,
     convex_url: str | None = None,
+    headless: bool = False,
 ) -> TasksResult:
     """
     Run all tasks as one browser agent session, recording a single video.
@@ -228,7 +229,7 @@ async def run_tasks(
 
     try:
         browser_session = Browser(
-            headless=False,
+            headless=headless,
             record_video_dir=str(output_dir),
         )
 
