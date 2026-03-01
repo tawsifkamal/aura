@@ -357,7 +357,7 @@
         "Issue is labeled with 'enhancement' and 'tech-debt' labels (create labels if they don't exist)"
       ],
       "priority": 22,
-      "passes": false,
+      "passes": true,
       "notes": "This is a self-audit step — the agent finds its own blind spots and creates a trackable issue so nothing falls through the cracks"
     }
   ]

@@ -376,3 +376,25 @@
   - Use `turbo run check-types lint test build` to run all quality gates in dependency-aware parallel order
   - Turbo caches test results — run `turbo run test --force` to force re-execution
 ---
+
+## 2026-02-28 - US-022
+- Scanned entire codebase for TODOs, FIXMEs, stubs, and gaps — no TODO/FIXME markers found
+- Used comprehensive codebase exploration to identify:
+  - 1 placeholder stub: `dispatch.ts` pipeline execution not wired
+  - 3 missing error handling paths in `pr-bot.ts` (unhandled fetch calls)
+  - 5 fully implemented but unused modules: laminar, supermemory, browser-recorder, sandbox, convex-uploader
+  - 6 untested modules without test files
+  - Missing pipeline orchestration layer connecting individual modules
+  - No `.env.example` for documenting required environment variables
+- Created `tech-debt` label on GitHub
+- Created GitHub issue #2: "Aura: Coverage gaps and incomplete areas" with categorized checklist
+  - 7 sections: stubs, error handling, unused integrations, untested modules, orchestration gap, thin coverage, config gaps
+  - Labeled with `enhancement` and `tech-debt`
+  - Priority guide included (Critical → Low)
+- Issue URL: https://github.com/tawsifkamal/aura/issues/2
+- Files changed: `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Use `gh label create` before `gh issue create` to ensure labels exist
+  - Heredoc with `ISSUE_EOF` delimiter avoids conflicts with backticks in markdown code blocks
+  - The main gap in Aura is the orchestration layer — all modules work individually but aren't connected end-to-end
+---
