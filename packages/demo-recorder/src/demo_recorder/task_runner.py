@@ -278,11 +278,11 @@ async def run_tasks(
         verdict_icon = "✅" if verdict == "pass" else "❌"
         print(f"{verdict_icon} Judge verdict: {verdict.upper()} — {str(verdict_reasoning)[:120]}")
 
-        # Trim about:blank / black opening from the recorded video
+        # Find recorded video (skip trimming - it can corrupt videos)
         video_files = list(output_dir.glob("*.mp4")) + list(output_dir.glob("*.webm"))
         final_video_path: Path | None = None
         for video_file in video_files:
-            final_video_path = trim_black_opening(video_file)
+            final_video_path = video_file
 
         # Upload to Convex if URL provided
         video_url: str | None = None
