@@ -7,6 +7,7 @@ export type AppContext = Context<{ Bindings: Env; Variables: { convex: ConvexCli
 export const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "https://aura-backend.poppets-grungy03.workers.dev",
+  "https://glimpse-rose.vercel.app",
 ];
 
 export interface PrPipelineMessage {
