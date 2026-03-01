@@ -355,12 +355,16 @@ async def run_tasks(
         # ── Set up virtual display if in container mode ──
         if use_xvfb:
             xvfb_proc = start_xvfb(":99", "1920x1080x24")
+            # Move cursor to top-left corner so it doesn't sit in center of frame
+            subprocess.run(["xdotool", "mousemove", "0", "0"], timeout=5, check=False)
 
         # ── Configure browser ──
         if use_xvfb:
-            # Non-headless on virtual display, no Playwright recording
+            # Non-headless on virtual display, kiosk mode hides toolbar
+            # so viewport = full 1920x1080 display = accurate click coordinates
             browser_profile = BrowserProfile(
                 headless=False,
+                args=["--kiosk"],
                 wait_between_actions=1.5,
                 minimum_wait_page_load_time=1.0,
             )
@@ -397,6 +401,19 @@ async def run_tasks(
         recording_start_time = time.time()
         history = await agent.run(max_steps=max_steps)
 
+        # ── Compute trim offset (dead time before first browser action) ──
+        trim_offset_sec = 0.0
+        if use_xvfb and history.history:
+            try:
+                first_step = history.history[0]
+                if first_step.metadata and hasattr(first_step.metadata, 'step_start_time'):
+                    first_step_start = first_step.metadata.step_start_time
+                    trim_offset_sec = first_step_start - recording_start_time
+                    # Subtract a small buffer so we don't cut into the action
+                    trim_offset_sec = max(0.0, trim_offset_sec - 0.5)
+            except (AttributeError, IndexError):
+                trim_offset_sec = 0.0
+
         # ── Extract interaction events from history ──
         interaction_events = extract_interaction_events(history, recording_start_time)
         print(f"  Extracted {len(interaction_events)} interaction events")
@@ -409,6 +426,33 @@ async def run_tasks(
         if ffmpeg_proc:
             stop_screen_recording(ffmpeg_proc)
             ffmpeg_proc = None
+
+        # ── Trim dead time from start of video ──
+        if use_xvfb and trim_offset_sec > 1.0:
+            trimmed_path = output_dir / "trimmed.mp4"
+            trim_result = subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-ss", f"{trim_offset_sec:.2f}",
+                    "-i", str(video_path),
+                    "-c", "copy",
+                    str(trimmed_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if trim_result.returncode == 0 and trimmed_path.exists() and trimmed_path.stat().st_size > 0:
+                trimmed_path.rename(video_path)
+                print(f"TRIM_OFFSET: {trim_offset_sec:.2f}")
+                # Adjust interaction event timestamps by the trim offset
+                trim_offset_ms = int(trim_offset_sec * 1000)
+                for event in interaction_events:
+                    event["atMs"] = max(0, event["atMs"] - trim_offset_ms)
+            else:
+                print(f"  Warning: trim failed (rc={trim_result.returncode}), keeping original video")
+                if trimmed_path.exists():
+                    trimmed_path.unlink()
 
         # ── Extract judge verdict ──
         judgement = history.judgement() if hasattr(history, 'judgement') else None
